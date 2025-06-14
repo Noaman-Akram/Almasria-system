@@ -1,0 +1,13 @@
+{
+  "sale": [
+    { "value": "pending", "label": "Pending" },
+    { "value": "converted", "label": "Converted to Work Order" },
+    { "value": "cancelled", "label": "Cancelled" }
+  ],
+  "work": [
+    { "value": "pending", "label": "Pending" },
+    { "value": "in_progress", "label": "In Progress" },
+    { "value": "completed", "label": "Completed" },
+    { "value": "cancelled", "label": "Cancelled" }
+  ]
+}

@@ -1,0 +1,6 @@
+[
+  { "name": "Kitchen", "code": "K", "value": "kitchen", "label": "Kitchen" },
+  { "name": "Walls", "code": "W", "value": "walls", "label": "Walls" },
+  { "name": "Floor", "code": "F", "value": "floor", "label": "Floor" },
+  { "name": "Other", "code": "X", "value": "other", "label": "Other" }
+]
