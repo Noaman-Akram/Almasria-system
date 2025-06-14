@@ -1,5 +1,3 @@
-import { createImageBitmap } from 'browser-image-compression';
-
 /**
  * Service for compressing images before upload
  */
