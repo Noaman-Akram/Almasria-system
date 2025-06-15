@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Loader2, UserPlus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../../components/ui/Button';
 import Toast from '../../components/ui/Toast';
 
 const Register: React.FC = () => {
-  const navigate = useNavigate();
   const { signUp } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

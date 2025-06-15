@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, ClipboardList, Settings, ChevronRight, ChevronLeft, FileText, Hammer, LogOut, Database, Calendar, Plus } from 'lucide-react';
+import { LayoutDashboard, Users,   Settings, ChevronRight, ChevronLeft, FileText, Hammer, LogOut, Database, Calendar, Plus } from 'lucide-react';
 import { NavItem } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../ui/Button';

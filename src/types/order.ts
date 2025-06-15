@@ -1,5 +1,6 @@
-import { OrderStage } from './entities';
+import { OrderStage } from '@/pages/scheduling/types';
 
+ 
 export * from './entities';
 
 export interface Customer {
@@ -79,6 +80,7 @@ export interface CreateOrderDTO {
 }
 
 export interface WorkOrderDetail {
+  img_url: string;
   detail_id: string;
   order_id: string;
   assigned_to: string;
@@ -97,6 +99,7 @@ export interface WorkOrderDetail {
     address: string;
     work_types: string[];
     created_at: string;
+    img_url?: string;
     customer?: {
       id: number;
       name: string;

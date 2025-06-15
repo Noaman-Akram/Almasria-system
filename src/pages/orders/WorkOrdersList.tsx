@@ -23,7 +23,6 @@ import {
   AlertCircle,
   CheckCircle2,
   CalendarClock,
-  DollarSign,
   Calculator,
   Printer,
   Camera,
@@ -35,8 +34,8 @@ import Card from '../../components/ui/Card';
 import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import EditWorkOrderDialog from '../../components/orders/EditWorkOrderDialog';
-import { STAGE_STATUSES, ORDER_TYPES } from '../../lib/constants';
-import { OrderCostBreakdown } from '../../types/order';
+import { STAGE_STATUSES } from '../../lib/constants';
+import { OrderCostBreakdown, WorkOrderDetail } from '../../types/order';
 
 interface WorkOrder {
   detail_id: string;
@@ -100,7 +99,7 @@ interface WorkOrder {
 type SortableField = keyof WorkOrder | 'customer_name' | 'code';
 
 // Image Modal Component
-const ImageModal = ({ isOpen, onClose, imageUrl, orderCode }) => {
+const ImageModal = ({ isOpen, onClose, imageUrl, orderCode }: { isOpen: boolean, onClose: () => void, imageUrl: string, orderCode: string }) => {
   if (!isOpen) return null;
 
   return (
@@ -123,7 +122,7 @@ const ImageModal = ({ isOpen, onClose, imageUrl, orderCode }) => {
           alt={`Work Order ${orderCode}`}
           className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
           onError={(e) => {
-            e.target.src =
+            (e.target as HTMLImageElement).src =
               'https://via.placeholder.com/400x300?text=Image+Not+Found';
           }}
         />
@@ -307,11 +306,6 @@ const WorkOrdersList = () => {
   };
 
   // Format date with time
-  const formatDateTime = (dateString: string | null) => {
-    if (!dateString) return 'Not set';
-    const date = new Date(dateString);
-    return date.toLocaleString();
-  };
 
   // Format date only
   const formatDate = (dateString: string | null) => {
@@ -873,7 +867,7 @@ const WorkOrdersList = () => {
                   const stagesInfo = getScheduledStagesInfo(order);
                   const orderCostBreakdowns =
                     costBreakdowns[order.detail_id] || [];
-                  const imageUrl = getImageUrl(order.img_url);
+                  const imageUrl = getImageUrl(order.img_url || null);
 
                   return (
                     <React.Fragment key={order.detail_id}>
@@ -1042,7 +1036,7 @@ const WorkOrdersList = () => {
                                           alt={`Work Order ${order.order?.code}`}
                                           className="w-32 h-32 object-cover group-hover:scale-105 transition-transform duration-200"
                                           onError={(e) => {
-                                            e.target.src =
+                                            (e.target as HTMLImageElement).src =
                                               'https://via.placeholder.com/128x128?text=No+Image';
                                           }}
                                         />
@@ -1113,7 +1107,7 @@ const WorkOrdersList = () => {
                                         </thead>
                                         <tbody className="bg-white divide-y divide-gray-200">
                                           {orderCostBreakdowns.map(
-                                            (item, index) => (
+                                            (item) => (
                                               <tr key={item.id}>
                                                 <td className="px-4 py-2 font-medium text-gray-900">
                                                   {item.type}
@@ -1197,7 +1191,7 @@ const WorkOrdersList = () => {
                                           </thead>
                                           <tbody className="bg-white divide-y divide-gray-200">
                                             {order.order.measurements.map(
-                                              (item, index) => (
+                                              (item) => (
                                                 <tr key={item.id}>
                                                   <td className="px-4 py-2 font-medium text-gray-900">
                                                     {item.material_name}
@@ -1431,7 +1425,7 @@ const WorkOrdersList = () => {
       {/* Add the dialog */}
       {editingOrder && (
         <EditWorkOrderDialog
-          workOrder={editingOrder}
+          workOrder={editingOrder as WorkOrderDetail}
           onClose={handleEditClose}
           onSave={handleEditSave}
         />
@@ -1441,8 +1435,8 @@ const WorkOrdersList = () => {
       <ImageModal
         isOpen={imageModalOpen}
         onClose={closeImageModal}
-        imageUrl={currentImage}
-        orderCode={currentOrderCode}
+        imageUrl={currentImage || ''}
+        orderCode={currentOrderCode || ''}
       />
     </div>
   );

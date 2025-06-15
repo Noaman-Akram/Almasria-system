@@ -6,7 +6,6 @@ import { cn } from "../../../components/lib/utils"
 
 const Dialog = DialogPrimitive.Root
 
-const DialogTrigger = DialogPrimitive.Trigger
 
 const DialogPortal = DialogPrimitive.Portal
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Search, Calendar, User, BadgeDollarSign, Tag } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import StatusBadge from '../ui/StatusBadge';

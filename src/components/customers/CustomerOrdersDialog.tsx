@@ -4,7 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogClose,
+  
 } from '../components/ui/dialog';
 import { supabase } from '../../lib/supabase';
 import { ChevronDown, ChevronUp } from 'lucide-react';

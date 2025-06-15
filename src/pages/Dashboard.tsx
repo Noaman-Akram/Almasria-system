@@ -5,8 +5,7 @@ import {
   ClipboardList,
   DollarSign,
   TrendingUp,
-  Calendar,
-  Package,
+ 
   Clock,
   Target,
   Activity,
@@ -119,8 +118,8 @@ const Dashboard: React.FC = () => {
       const orderStatusData = Object.entries(statusCounts).map(
         ([status, count]) => ({
           status,
-          count,
-          percentage: (count / totalOrders) * 100,
+          count: count as number,
+          percentage: ((count as number) / totalOrders) * 100,
         })
       );
 
@@ -139,8 +138,8 @@ const Dashboard: React.FC = () => {
 
       const orderTypeData = Object.entries(typeCounts).map(([type, count]) => ({
         type,
-        count,
-        percentage: (count / totalOrders) * 100,
+        count: count as number,
+        percentage: ((count as number) / totalOrders) * 100,
       }));
 
       // Monthly data for the last 6 months
@@ -209,7 +208,7 @@ const Dashboard: React.FC = () => {
 
   const generateMonthlyData = (
     orders: any[],
-    customers: any[]
+    _customers: any[]
   ): MonthlyData[] => {
     const months = [];
     const now = new Date();
@@ -498,7 +497,7 @@ const Dashboard: React.FC = () => {
           <div className="h-80">
             <Doughnut
               data={orderStatusChartData}
-              options={doughnutOptions}
+              options={doughnutOptions as any}
               plugins={[ChartDataLabels]}
             />
           </div>
@@ -509,7 +508,7 @@ const Dashboard: React.FC = () => {
           <div className="h-80">
             <Doughnut
               data={orderTypeChartData}
-              options={doughnutOptions}
+              options={doughnutOptions as any}
               plugins={[ChartDataLabels]}
             />
           </div>
@@ -521,14 +520,14 @@ const Dashboard: React.FC = () => {
         {/* Orders Over Time */}
         <Card title="Orders Over Time">
           <div className="h-80">
-            <Line data={revenueChartData} options={chartOptions} />
+            <Line data={revenueChartData} options={chartOptions as any} />
           </div>
         </Card>
 
         {/* Average Order Value */}
         <Card title="Monthly Orders">
           <div className="h-80">
-            <Bar data={ordersChartData} options={chartOptions} />
+            <Bar data={ordersChartData} options={chartOptions as any  } />
           </div>
         </Card>
       </div>

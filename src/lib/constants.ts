@@ -5,19 +5,6 @@ export const WORK_TYPES = [
   { name: 'Other', code: 'X', value: 'other', label: 'Other' }
 ] as const;
 
-const ORDER_STATUSES = {
-  sale: [
-    { value: 'pending', label: 'Pending' },
-    { value: 'converted', label: 'Converted to Work Order' },
-    { value: 'cancelled', label: 'Cancelled' }
-  ],
-  work: [
-    { value: 'pending', label: 'Pending' },
-    { value: 'in_progress', label: 'In Progress' },
-    { value: 'completed', label: 'Completed' },
-    { value: 'cancelled', label: 'Cancelled' }
-  ]
-} as const;
 
 export const EGYPTIAN_CITIES = [
   'Cairo', 'Alexandria', 'Giza', 'Shubra El Kheima', 'Port Said',

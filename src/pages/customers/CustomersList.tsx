@@ -1,23 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { PlusCircle, User } from 'lucide-react';
-import Button from '../../components/ui/Button';
+import { User } from 'lucide-react';
 import Card from '../../components/ui/Card';
-import DataTable from '../../components/ui/DataTable';
 import { Customer } from '../../types';
 import { CustomerService } from '../../services/CustomerService';
-import CustomerOrdersDialog from '../../components/customers/CustomerOrdersDialog';
 import OrdersList from '../../components/orders/OrdersList';
 import OrderDetailsDialog from '../../components/orders/OrderDetailsDialog';
 
 const CustomersList: React.FC = () => {
-  const navigate = useNavigate();
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
-    null
-  );
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [, setLoading] = useState(false);
   const [expandedCustomerId, setExpandedCustomerId] = useState<
     string | number | null
   >(null);

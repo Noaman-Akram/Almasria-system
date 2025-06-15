@@ -4,19 +4,15 @@ import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface CalendarProps {
-  mode?: "single";
   selected?: Date;
   onSelect?: (date: Date | null) => void;
   disabled?: (date: Date) => boolean;
-  initialFocus?: boolean;
 }
 
 export function Calendar({ 
-  mode = "single", 
   selected, 
   onSelect, 
   disabled,
-  initialFocus
 }: CalendarProps) {
   // State for displayed month/year, default to selected or today
   const [displayedDate, setDisplayedDate] = React.useState(() => selected ? new Date(selected) : new Date());

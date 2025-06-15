@@ -20,7 +20,7 @@ interface CostBreakdownSectionProps {
 const CostBreakdownSection: React.FC<CostBreakdownSectionProps> = ({
   costBreakdown,
   onCostBreakdownChange,
-}) => {
+}): JSX.Element => {
   const updateCostBreakdown = (
     field: keyof CostBreakdown,
     value: number | null
@@ -64,7 +64,7 @@ const CostBreakdownSection: React.FC<CostBreakdownSectionProps> = ({
     updateCostBreakdown(field, numericValue);
   };
 
-  const getTotalCost = () => {
+  const getTotalCost = (): number => {
     const costs = [
       costBreakdown.cutting_cost,
       costBreakdown.finishing_cost,
@@ -72,7 +72,7 @@ const CostBreakdownSection: React.FC<CostBreakdownSectionProps> = ({
       costBreakdown.other_cost,
     ];
 
-    return costs.reduce((sum, cost) => sum + (cost || 0), 0);
+    return costs.reduce((sum: number, cost) => sum + (cost || 0), 0);
   };
 
   return (
@@ -283,7 +283,7 @@ const CostBreakdownSection: React.FC<CostBreakdownSectionProps> = ({
           <div className="flex items-center justify-between">
             <h4 className="font-medium text-gray-900">Total Cost Breakdown</h4>
             <div className="text-xl font-bold text-green-600">
-              {getTotalCost().toFixed(2)} EGP
+              {(getTotalCost() || 0).toFixed(2)} EGP
             </div>
           </div>
           <div className="mt-2 text-sm text-gray-600 space-y-1">

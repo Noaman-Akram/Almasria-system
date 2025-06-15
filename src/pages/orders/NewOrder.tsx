@@ -5,14 +5,12 @@ import {
   Home,
   Phone,
   Plus,
-  Store,
-  Trash2,
+    Trash2,
   User,
   UserPlus,
   MapPin,
   Ruler,
   Box,
-  Percent,
   Loader2,
   Printer
 } from 'lucide-react';
@@ -20,13 +18,11 @@ import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import RadioGroup from '../../components/ui/RadioGroup';
 import Toast from '../../components/ui/Toast';
-import { EGYPTIAN_CITIES, WORK_TYPES, MATERIAL_TYPES, UNITS, ENGINEERS } from '../../lib/constants';
+import { EGYPTIAN_CITIES, WORK_TYPES, MATERIAL_TYPES, UNITS } from '../../lib/constants';
 import { useAuth } from '../../contexts/AuthContext';
 import { OrderService } from '../../services/OrderService';
 import { CreateOrderDTO } from '../../types/order';
 import { CustomerService } from '../../services/CustomerService';
-import { supabase } from '../../lib/supabase';
-import { useNavigate } from 'react-router-dom';
 
 interface CustomerInput {
   name: string;
@@ -99,7 +95,6 @@ const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
   const [realCustomers, setRealCustomers] = useState<any[]>([]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [lastOrderSummary, setLastOrderSummary] = useState<any | null>(null);
-  const navigate = useNavigate();
   const orderPrice = measurements.reduce((sum, m) => sum + (m.quantity * m.cost), 0);
   const discountedTotal = Math.max(0, orderPrice - (order.discount || 0));
   

@@ -4,18 +4,14 @@ import {
   PlusCircle,
   ChevronDown,
   ChevronUp,
-  Calendar,
   User,
-  BadgeDollarSign,
   Receipt,
   ListFilter,
   Search,
-  Info,
   Tag,
   ArrowUpDown,
   MapPin,
   Building2,
-  Phone,
   Box,
   Ruler,
   Trash2,
@@ -25,7 +21,6 @@ import Button from '../../../components/ui/Button';
 import Card from '../../../components/ui/Card';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import { Order } from '../../../types/order';
-import { OrderService } from '../../../services/OrderService';
 import { supabase } from '../../../lib/supabase';
 import { EGYPTIAN_CITIES, WORK_TYPES, MATERIAL_TYPES, UNITS } from '../../../lib/constants';
 
@@ -38,7 +33,7 @@ const SaleOrdersList = () => {
   const [page, setPage] = useState(0);
   const LIMIT = 40;
   const [orderMeasurements, setOrderMeasurements] = useState<Record<number, any[]>>({});
-  const [orderDetails, setOrderDetails] = useState<Record<number, any[]>>({});
+  const [, setOrderDetails] = useState<Record<number, any[]>>({});
   const [loadingDetails, setLoadingDetails] = useState<number | null>(null);
   const [sortField, setSortField] = useState('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -151,12 +146,6 @@ const SaleOrdersList = () => {
   };
 
   // Helper to render order summary
-  const renderOrderSummary = (order: any) => (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 rounded-lg p-4 mb-2 text-xs text-gray-700">
-      <div><b>Order Price:</b> <span className="text-blue-700 font-bold">{order.order_price} EGP</span></div>
-      <div><b>Created At:</b> {formatDate(order.created_at)}</div>
-    </div>
-  );
 
   // Open edit modal and prefill form
   const handleEditOrder = async (order: any) => {
@@ -281,7 +270,6 @@ const SaleOrdersList = () => {
         console.log('[EditOrder] Regenerated order code:', newCode);
       }
       // Calculate new order cost
-      const newOrderCost = editMeasurements.reduce((sum, m) => sum + (m.quantity * m.price), 0);
       // Update order
       console.log('[SaleOrdersList] Updating order:', editOrder.id);
       const { error: orderError } = await supabase.from('orders').update({

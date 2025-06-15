@@ -2,10 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
-  User,
-  Building2,
-  Phone,
-  MapPin,
   Box,
   Clock,
   Calculator,
@@ -20,16 +16,13 @@ import {
   Package,
   Upload,
   Image,
-  X,
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { supabase } from '../../lib/supabase';
-import { WORK_TYPES, ENGINEERS } from '../../lib/constants';
+import { ENGINEERS } from '../../lib/constants';
 import SaleOrderSelector from '../../components/orders/SaleOrderSelector';
 import { useAuth } from '../../contexts/AuthContext';
-import { CreateWorkOrderDTO, OrderCostBreakdown } from '../../types/order';
-import { WorkOrderService } from '../../services/WorkOrderService';
 import Toast from '../../components/ui/Toast';
 import { ImageCompression } from '../../services/ImageCompression';
 
@@ -75,7 +68,6 @@ const NewWorkOrder: React.FC = () => {
   const { orderId } = useParams<{ orderId?: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const workOrderService = new WorkOrderService();
   
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -345,40 +337,7 @@ const NewWorkOrder: React.FC = () => {
           setImageUploading(false);
         }
       }
-
-      // 2. Create work order
-      const totalCost = calculateTotalCost();
-
-      // Only include cost breakdown items that have values
-      const validCostBreakdown = costBreakdown.filter(
-        (item) => item.total_cost !== null && item.total_cost > 0
-      );
-
-      const workOrderDto: CreateWorkOrderDTO = {
-        order_id: selectedSaleOrder.id,
-        assigned_to: workOrderData.assigned_to,
-        due_date:
-          workOrderData.due_date ||
-          new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split('T')[0], // Default to 7 days from now if not provided
-        price: workOrderData.price,
-        total_cost: totalCost,
-        notes: workOrderData.notes,
-        img_url: imageUrl,
-        cost_breakdown: validCostBreakdown.map((item) => ({
-          type: item.type,
-          quantity: item.quantity,
-          unit: item.unit,
-          cost_per_unit: item.cost_per_unit,
-          total_cost: item.total_cost,
-          notes: item.notes,
-          added_by: workOrderData.assigned_to,
-        })),
-      };
-
-      // 3. Create work order
-      const createdWorkOrder = await workOrderService.create(workOrderDto);
+ 
 
       // 4. Update sale order status to 'working' (not 'converted')
       await supabase
@@ -407,16 +366,6 @@ const NewWorkOrder: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  // Helper function to get icon for cost breakdown type
-  const getCostBreakdownIcon = (type: string) => {
-    const typeConfig = COST_BREAKDOWN_TYPES.find((t) => t.value === type);
-    if (typeConfig) {
-      const IconComponent = typeConfig.icon;
-      return <IconComponent className={`h-4 w-4 ${typeConfig.color}`} />;
-    }
-    return <Settings className="h-4 w-4 text-gray-600" />;
   };
 
   return (

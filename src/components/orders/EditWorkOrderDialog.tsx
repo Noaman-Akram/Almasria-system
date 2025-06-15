@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   X,
   User,
@@ -7,8 +7,7 @@ import {
   MapPin,
   Box,
   Clock,
-  Ruler,
-  Trash2,
+    Trash2,
   Plus,
   DollarSign,
   Loader2,
@@ -21,18 +20,12 @@ import {
   Upload,
   Image,
 } from 'lucide-react';
-import { WorkOrderDetail, OrderCostBreakdown } from '../../types/order';
+import { WorkOrderDetail } from '../../types/order';
 import { supabase } from '../../lib/supabase';
 import Button from '../ui/Button';
 import {
-  EGYPTIAN_CITIES,
-  MATERIAL_TYPES,
-  UNITS,
   WORK_TYPES,
 } from '../../lib/constants';
-import { formatDate } from '../../utils/date';
-import RadioGroup from '../ui/RadioGroup';
-import { ImageUploadService } from '../../services/ImageUploadService';
 import { ImageCompression } from '../../services/ImageCompression';
 
 interface EditWorkOrderDialogProps {
