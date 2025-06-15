@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { CreateOrderDTO, Order, Customer, Measurement } from '../types/order';
+import { CreateOrderDTO, Order, Customer } from '../types/order';
 
 export class OrderService {
   async upsertCustomer(
@@ -124,9 +124,7 @@ export class OrderService {
       );
       throw measurementsError;
     }
-    // 5. Calculate order_cost
-    const orderCost = measurements.reduce((sum, m) => sum + m.total_price, 0); // Updated field name
-    // 6. Return the full order
+    // 5. Return the full order
     const { data: fullOrder, error: fetchError } = await supabase
       .from('orders')
       .select('*')

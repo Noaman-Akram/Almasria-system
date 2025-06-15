@@ -5,7 +5,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '../components/components/ui/dialog';
 import { Label } from '../components/components/ui/label';
 import { Trash2, Plus, Edit2, Save, X } from 'lucide-react';
@@ -141,7 +140,7 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleDeleteItem = async (categoryKey: string, itemId: string) => {
+  const handleDeleteItem = async (itemId: string) => {
     if (!confirm('Are you sure you want to delete this item?')) return;
 
     try {
@@ -245,7 +244,7 @@ const Settings: React.FC = () => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDeleteItem(category.key, item.id!)}
+                      onClick={() => handleDeleteItem(item.id!)}
                       className="text-red-600 hover:text-red-700"
                     >
                       <Trash2 className="h-4 w-4" />

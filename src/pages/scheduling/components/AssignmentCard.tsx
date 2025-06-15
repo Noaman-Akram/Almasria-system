@@ -58,20 +58,6 @@ const getStageColors = (
   );
 };
 
-// Get priority color class (matching our schedule system)
-const getPriorityColorClass = (priority?: string) => {
-  switch (priority) {
-    case 'urgent':
-      return 'bg-red-500 border-red-600';
-    case 'high':
-      return 'bg-orange-500 border-orange-600';
-    case 'low':
-      return 'bg-blue-300 border-blue-400';
-    default:
-      return 'bg-gray-400 border-gray-500';
-  }
-};
-
 // Priority badge component (matching our schedule system)
 const PriorityBadge = ({ priority }: { priority?: string }) => {
   if (!priority || priority === 'normal') return null;
@@ -106,7 +92,6 @@ export const AssignmentCard = ({
   const isDone = assignment.is_done || false;
 
   const stageColors = getStageColors(stage?.stage_name);
-  const priorityColor = getPriorityColorClass(priority);
 
   const handleDelete = (
     e: React.MouseEvent,
@@ -144,11 +129,9 @@ export const AssignmentCard = ({
       )}
 
       {/* Completion date */}
-      {isDone && assignment.order_stage?.actual_finish_date && (
+      {isDone && stage?.actual_finish_date && (
         <div className="absolute top-2 right-2 text-xs text-green-700">
-          {new Date(
-            assignment.order_stage.actual_finish_date
-          ).toLocaleDateString()}
+          {new Date(stage.actual_finish_date).toLocaleDateString()}
         </div>
       )}
       <div className="space-y-2 mt-2">

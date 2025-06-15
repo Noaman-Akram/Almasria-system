@@ -14,7 +14,7 @@ export interface Customer {
 }
 
 // Order Types
-interface Order {
+export interface Order {
   id: number;
   code: string;
   customer_id: number;
@@ -30,7 +30,7 @@ interface Order {
 }
 
 // Measurement Types
-interface Measurement {
+export interface Measurement {
   id: number;
   order_id: number;
   material_name: string;
@@ -42,7 +42,7 @@ interface Measurement {
 }
 
 // Status Types
-type OrderStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'converted';
+export type OrderStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'converted';
 
 // Navigation Types
 export interface NavItem {
@@ -52,7 +52,7 @@ export interface NavItem {
 }
 
 // Work Type
-interface WorkType {
+export  interface WorkType {
   name: string;
   code: string;
   value: string;

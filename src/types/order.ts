@@ -143,7 +143,7 @@ export interface WorkOrderStage {
   updated_at: string;
 }
 
-interface WorkOrderStageAssignment {
+export interface WorkOrderStageAssignment {
   id: number;
   order_stage_id: number;
   employee_name: string;

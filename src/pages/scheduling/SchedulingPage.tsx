@@ -1,9 +1,8 @@
 //SchedulingPage.tsx
 'use client';
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import { format, isSameDay } from 'date-fns';
-import { Plus } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { format } from 'date-fns';
 import { useSearchParams } from 'react-router-dom';
 
 // Hooks
@@ -42,9 +41,6 @@ export default function SchedulingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const orderIdFromUrl = searchParams.get('orderId');
 
-  // Debug state
-  const [showDebug, setShowDebug] = useState(true);
-
   // Calendar navigation
   const {
     currentDate,
@@ -80,7 +76,6 @@ export default function SchedulingPage() {
     isAnyFilterActive,
     resetFilters,
     filterAssignments,
-    getUniqueStatuses,
   } = useFilters();
 
   // UI State
@@ -178,16 +173,6 @@ export default function SchedulingPage() {
   }, [assignments, filters, orders, stages, filterAssignments]);
 
   // Get assignments for a specific day
-  const getAssignmentsForDay = useCallback(
-    (date: Date) => {
-      if (!filteredAssignments || !Array.isArray(filteredAssignments))
-        return [];
-
-      const dateStr = format(date, 'yyyy-MM-dd');
-      return filteredAssignments.filter((a) => a?.work_date === dateStr);
-    },
-    [filteredAssignments]
-  );
 
   // ENHANCED: Multi-employee assignment reconciliation logic
   const handleSubmitAssignment = async (
@@ -448,10 +433,6 @@ export default function SchedulingPage() {
   };
 
   // Get unique statuses for filtering
-  const statusOptions = useMemo(
-    () => getUniqueStatuses(stages),
-    [stages, getUniqueStatuses]
-  );
 
   // Overall loading state
   const overallLoading = loading || ordersLoading;

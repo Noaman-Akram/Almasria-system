@@ -39,7 +39,6 @@ const DateRangePicker = ({
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
             <CalendarComponent
-              mode="single"
               selected={startDate || undefined}
               onSelect={(date) => {
                 onStartDateChange(date);
@@ -48,7 +47,7 @@ const DateRangePicker = ({
                   onEndDateChange(addDays(date, 1));
                 }
               }}
-              initialFocus
+               
             />
           </PopoverContent>
         </Popover>
@@ -68,15 +67,13 @@ const DateRangePicker = ({
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <CalendarComponent
-                mode="single"
-                selected={endDate || undefined}
+                 selected={endDate || undefined}
                 onSelect={(date) => {
                   onEndDateChange(date);
                   setIsEndDateOpen(false);
                 }}
                 disabled={(date) => (startDate ? isBefore(date, startDate) || isEqual(date, startDate) : false)}
-                initialFocus
-              />
+               />
             </PopoverContent>
           </Popover>
         </div>

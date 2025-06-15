@@ -48,7 +48,7 @@ export const getStageColorScheme = (status?: string): ColorScheme => {
   }
 };
 
-const groupAssignmentsByStageAndDate = (assignments: OrderStageAssignment[]): Record<string, OrderStageAssignment[]> => {
+export const groupAssignmentsByStageAndDate = (assignments: OrderStageAssignment[]): Record<string, OrderStageAssignment[]> => {
   const grouped: Record<string, OrderStageAssignment[]> = {};
   
   assignments.forEach((assignment) => {
@@ -62,7 +62,7 @@ const groupAssignmentsByStageAndDate = (assignments: OrderStageAssignment[]): Re
   return grouped;
 };
 
-const getOrderForAssignment = (
+export const getOrderForAssignment = (
   assignment: OrderStageAssignment, 
   orders: Order[], 
   stages: OrderStage[]
@@ -73,7 +73,7 @@ const getOrderForAssignment = (
   return orders.find(order => order.id === stage.order_id);
 };
 
-const getStageForAssignment = (
+export const getStageForAssignment = (
   assignment: OrderStageAssignment, 
   stages: OrderStage[]
 ): OrderStage | undefined => {

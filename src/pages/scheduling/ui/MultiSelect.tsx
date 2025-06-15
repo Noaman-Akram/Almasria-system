@@ -41,7 +41,7 @@ const MultiSelect = ({
         >
           {selected.length > 0 ? (
             <div className="flex items-center gap-1">
-              <Badge variant="secondary\" className="text-xs px-1 py-0">
+              <Badge variant="secondary" className="text-xs px-1 py-0">
                 {selected.length} selected
               </Badge>
             </div>

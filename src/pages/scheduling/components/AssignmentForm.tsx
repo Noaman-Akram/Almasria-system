@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   format,
   isBefore,
-  isEqual,
   addDays,
   eachDayOfInterval,
 } from 'date-fns';
@@ -26,10 +25,8 @@ import {
   SelectValue,
 } from '../../../components/components/ui/select';
 import {
-  Order,
   OrderStage,
   OrderStageAssignment,
-  OrderDetailWithStages,
 } from '../types';
 import DateRangePicker from '../ui/DateRangePicker';
 import MultiSelect from '../ui/MultiSelect';
@@ -302,7 +299,7 @@ export function AssignmentForm({
       updateFormState({
         selectedOrderId: orderId,
         selectedStageId: null, // Reset stage when order changes
-        errors: { ...formState.errors, order: undefined },
+        errors: { ...formState.errors, order: '' },
       });
     },
     [updateFormState, formState.errors]
@@ -315,7 +312,7 @@ export function AssignmentForm({
 
       updateFormState({
         selectedStageId: stageId,
-        errors: { ...formState.errors, stage: undefined },
+        errors: { ...formState.errors, stage: '' },
       });
     },
     [updateFormState, formState.errors]
@@ -325,7 +322,7 @@ export function AssignmentForm({
     (employees: string[]) => {
       updateFormState({
         selectedEmployees: employees,
-        errors: { ...formState.errors, employees: undefined },
+        errors: { ...formState.errors, employees: '' },
       });
     },
     [updateFormState, formState.errors]
@@ -335,7 +332,7 @@ export function AssignmentForm({
     (date: Date | null) => {
       updateFormState({
         startDate: date,
-        errors: { ...formState.errors, startDate: undefined },
+        errors: { ...formState.errors, startDate: '' },
       });
     },
     [updateFormState, formState.errors]
@@ -345,7 +342,7 @@ export function AssignmentForm({
     (date: Date | null) => {
       updateFormState({
         endDate: date,
-        errors: { ...formState.errors, endDate: undefined },
+        errors: { ...formState.errors, endDate: '' },
       });
     },
     [updateFormState, formState.errors]

@@ -11,7 +11,6 @@ interface CalendarHeaderProps {
 }
 
 function CalendarHeader({
-  currentDate,
   weekRangeText,
   onPreviousWeek,
   onNextWeek,

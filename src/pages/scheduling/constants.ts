@@ -15,25 +15,15 @@ export const STATIC_EMPLOYEES: Employee[] = [
 ];
 
 // Stage statuses with colors
-const STAGE_STATUSES = [
+/* const STAGE_STATUSES = [
   { value: "not_started", label: "Not Started", color: "gray" },
   { value: "in_progress", label: "In Progress", color: "blue" },
   { value: "completed", label: "Completed", color: "green" },
   { value: "delayed", label: "Delayed", color: "red" },
   { value: "on_hold", label: "On Hold", color: "yellow" }
-];
+]; */
 
 // Standard stages for work orders
-const STANDARD_STAGES = [
-  { value: "measurement", label: "Measurement" },
-  { value: "design", label: "Design" },
-  { value: "material_selection", label: "Material Selection" },
-  { value: "fabrication", label: "Fabrication" },
-  { value: "installation", label: "Installation" },
-  { value: "finishing", label: "Finishing" },
-  { value: "quality_check", label: "Quality Check" },
-  { value: "delivery", label: "Delivery" }
-];
 
 // Debug flags
 export const DEBUG = {

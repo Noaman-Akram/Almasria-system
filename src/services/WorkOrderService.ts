@@ -105,7 +105,7 @@ export class WorkOrderService {
   }
 
   // Upload image to external provider (stub, replace with real logic)
-  async uploadImage(file: File): Promise<string> {
+  async uploadImage(): Promise<string> {
     // TODO: Replace with real upload logic (e.g., Cloudinary, S3, etc.)
     // For now, just return a placeholder URL
     return Promise.resolve(

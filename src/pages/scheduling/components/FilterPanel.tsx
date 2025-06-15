@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Badge } from "../../../components/components/ui/badge"
 import { ScrollArea } from "../../../components/components/ui/scroll-area"
 import MultiSelect from "../ui/MultiSelect"
-import type { Order, OrderStage, Employee } from "../../../types/entities"
+import { Employee, Order, OrderStage } from "../types"
+
 
 interface FilterPanelProps {
   orders: Order[]
@@ -52,12 +53,6 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
     return Array.from(statuses)
   }, [stages])
 
-  const toggleStatus = (status: string) => {
-    const newStatuses = selectedStatuses.includes(status)
-      ? selectedStatuses.filter((s) => s !== status)
-      : [...selectedStatuses, status]
-    setSelectedStatuses(newStatuses)
-  }
 
   return (
     <div
