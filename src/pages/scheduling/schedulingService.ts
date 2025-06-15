@@ -261,6 +261,8 @@ export async function createAssignment(
 export async function updateAssignment(
   id: number,
   updates: Omit<Partial<OrderStageAssignment>, 'id'>,
+  _userId?: string
+
 ): Promise<OrderStageAssignment> {
   try {
     console.log(`Updating assignment ${id}:`, updates);
@@ -326,6 +328,7 @@ export async function updateAssignment(
  */
 export async function deleteAssignment(
   id: number,
+  _userId?: string
 ): Promise<void> {
   console.log(`Deleting assignment ${id}`);
 

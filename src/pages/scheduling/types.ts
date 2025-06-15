@@ -40,6 +40,7 @@ export interface OrderStageAssignment {
   is_done?: boolean | null;
   created_at?: string;
   employee_rate?: number | null;
+  stage?: OrderStage;
 }
 
 export interface OrderDetailWithStages {

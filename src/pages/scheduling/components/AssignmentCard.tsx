@@ -129,9 +129,9 @@ export const AssignmentCard = ({
       )}
 
       {/* Completion date */}
-      {isDone && stage?.actual_finish_date && (
+      {isDone && assignment.stage?.actual_finish_date && (
         <div className="absolute top-2 right-2 text-xs text-green-700">
-          {new Date(stage.actual_finish_date).toLocaleDateString()}
+          {new Date(assignment.stage.actual_finish_date).toLocaleDateString()}
         </div>
       )}
       <div className="space-y-2 mt-2">

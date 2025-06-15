@@ -25,7 +25,14 @@ function normalizeCalendarData(calendarData: CalendarData[]): {
   calendarData.forEach((assignment) => {
     // Process assignment
     const { order_stages, ...assignmentData } = assignment;
-    assignments.push(assignmentData as OrderStageAssignment);
+    
+    // Create the assignment with the stage data included
+    const normalizedAssignment = {
+      ...assignmentData,
+      stage: order_stages, // Include the stage data directly in the assignment
+    } as OrderStageAssignment;
+    
+    assignments.push(normalizedAssignment);
 
     // Process stage if it exists
     if (order_stages) {
