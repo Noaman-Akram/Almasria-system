@@ -1,4 +1,4 @@
-import { Order, OrderStage, OrderStageAssignment, Employee } from './types';
+import { Order, OrderStage, OrderStageAssignment } from './types';
 import { supabase } from '../../lib/supabase';
 
 // Types for the joined data
@@ -261,7 +261,6 @@ export async function createAssignment(
 export async function updateAssignment(
   id: number,
   updates: Omit<Partial<OrderStageAssignment>, 'id'>,
-  userId?: string
 ): Promise<OrderStageAssignment> {
   try {
     console.log(`Updating assignment ${id}:`, updates);
@@ -327,7 +326,6 @@ export async function updateAssignment(
  */
 export async function deleteAssignment(
   id: number,
-  userId?: string
 ): Promise<void> {
   console.log(`Deleting assignment ${id}`);
 
