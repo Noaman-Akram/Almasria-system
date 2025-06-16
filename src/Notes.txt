@@ -1,0 +1,22 @@
+[16:40:29.460] Running build in Washington, D.C., USA (East) – iad1
+[16:40:29.460] Build machine configuration: 2 cores, 8 GB
+[16:40:29.478] Cloning github.com/Noaman-Akram/Almasria-system (Branch: main, Commit: 4ae6e8d)
+[16:40:29.756] Cloning completed: 278.000ms
+[16:40:30.017] Restored build cache from previous deployment (CywWQzMpD2EZSnKVdChh1v6nwCab)
+[16:40:30.535] Running "vercel build"
+[16:40:30.987] Vercel CLI 42.2.0
+[16:40:31.549] Installing dependencies...
+[16:40:32.954] 
+[16:40:32.955] up to date in 1s
+[16:40:32.955] 
+[16:40:32.956] 69 packages are looking for funding
+[16:40:32.956]   run `npm fund` for details
+[16:40:32.994] Running "npm run build"
+[16:40:33.113] 
+[16:40:33.114] > marble-crm@0.1.0 build
+[16:40:33.114] > tsc && vite build
+[16:40:33.114] 
+[16:40:42.318] src/components/layout/Header.tsx(63,13): error TS2322: Type '"ghost"' is not assignable to type '"primary" | "secondary" | "outline" | "danger" | undefined'.
+[16:40:42.347] Error: Command "npm run build" exited with 2
+[16:40:42.646] 
+[16:40:45.586] Exiting build container
