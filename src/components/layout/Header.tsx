@@ -1,11 +1,23 @@
 import React from 'react';
-import { Bell, Search, User, Menu } from 'lucide-react';
+import { Bell, Search, User, Menu, LogOut } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import Button from '../ui/Button';
 
 interface HeaderProps {
   onMenuClick: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
+  const { user, signOut } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
   return (
     <header className="bg-white shadow-sm h-16 flex items-center justify-between px-4 sm:px-6">
       <div className="flex items-center">
@@ -36,10 +48,26 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         </button>
         
         <div className="flex items-center space-x-3">
-          <span className="text-sm font-medium text-gray-700 hidden sm:block">Admin User</span>
+          <div className="text-right hidden sm:block">
+            <div className="text-sm font-medium text-gray-700">
+              {user?.email || 'Unknown User'}
+            </div>
+            <div className="text-xs text-gray-500">
+              {user?.user_metadata?.role || 'User'}
+            </div>
+          </div>
           <div className="bg-gray-200 rounded-full p-2">
             <User size={20} className="text-gray-600" />
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLogout}
+            className="text-gray-500 hover:text-gray-700"
+            title="Logout"
+          >
+            <LogOut size={16} />
+          </Button>
         </div>
       </div>
     </header>
