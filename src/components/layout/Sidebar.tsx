@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users,   Settings, ChevronRight, ChevronLeft, FileText, Hammer, LogOut, Database, Calendar, Plus } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, ChevronRight, ChevronLeft, FileText, Hammer, LogOut, Database, Calendar, Plus } from 'lucide-react';
 import { NavItem } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../ui/Button';
@@ -10,7 +10,7 @@ interface SidebarProps {
   onClose: () => void;
 }
 
-const navItems: NavItem[] = [
+const allNavItems: NavItem[] = [
   {
     name: 'Dashboard',
     path: '/',
@@ -48,10 +48,17 @@ const navItems: NavItem[] = [
   }
 ];
 
+// Define which pages each role can access
+const rolePermissions = {
+  admin: ['/', '/customers', '/orders/sale', '/orders/work', '/scheduling', '/tables', '/settings'],
+  sales: ['/', '/orders/sale', '/scheduling'], // Sales users can only access dashboard, sale orders, and scheduling
+  user: ['/', '/orders/sale'] // Default users get minimal access
+};
+
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const [collapsed, setCollapsed] = React.useState(false);
   const location = useLocation();
-  const { signOut } = useAuth();
+  const { signOut, userRole, user } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -62,6 +69,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       console.error('Logout failed:', error);
     }
   };
+
+  // Filter navigation items based on user role
+  const getFilteredNavItems = (): NavItem[] => {
+    const currentRole = userRole || 'user';
+    const allowedPaths = rolePermissions[currentRole as keyof typeof rolePermissions] || rolePermissions.user;
+    
+    return allNavItems.filter(item => allowedPaths.includes(item.path));
+  };
+
+  const navItems = getFilteredNavItems();
 
   return (
     <aside 
@@ -97,6 +114,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                             (item.path !== '/' && location.pathname.startsWith(item.path));
               const isWorkOrders = item.path === '/orders/work';
               const isSaleOrders = item.path === '/orders/sale';
+              const canCreateNew = userRole === 'admin' || userRole === 'sales'; // Both admin and sales can create orders
+              
               return (
                 <li key={item.path} className="group flex items-center">
                   <Link 
@@ -112,14 +131,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   >
                     <item.icon className={`h-5 w-5 ${isActive && isWorkOrders ? 'text-green-200' : ''}`} />
                     {!collapsed && <span className="ml-4">{item.name}</span>}
-                    {!collapsed && (isSaleOrders || isWorkOrders) && (
+                    {!collapsed && (isSaleOrders || (isWorkOrders && userRole === 'admin')) && canCreateNew && (
                       <div
                         className="ml-auto p-0.5 w-6 h-6 min-w-0 min-h-0 flex items-center justify-center absolute right-2 top-1/2 -translate-y-1/2 border bg-[#1f2937] border-[#374151] text-[#9ca3af] rounded-md cursor-pointer transition-colors duration-150 hover:bg-[#232b36] hover:border-[#4b5563] hover:text-[#d1d5db]"
                         title={`Add New ${isSaleOrders ? 'Sale' : 'Work'} Order`}
                         onClick={e => {
                           e.preventDefault();
                           e.stopPropagation();
-                          navigate(isSaleOrders ? '/orders/sale/new' : '/orders/work/new');
+                          if (isSaleOrders) {
+                            navigate('/orders/sale/new');
+                          } else if (isWorkOrders && userRole === 'admin') {
+                            navigate('/orders/work/new');
+                          }
                           onClose();
                         }}
                       >
@@ -138,7 +161,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         {!collapsed && (
           <div className="space-y-4">
             <div className="text-xs text-gray-400">
-              Version 1.0.0
+              <div>Version 1.0.0</div>
+              <div className="mt-1">
+                Role: <span className="text-blue-400 font-medium">{userRole || 'user'}</span>
+              </div>
+              <div className="mt-1 truncate">
+                {user?.email}
+              </div>
             </div>
             <Button
               variant="outline"
