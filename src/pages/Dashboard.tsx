@@ -5,11 +5,12 @@ import {
   ClipboardList,
   DollarSign,
   TrendingUp,
- 
   Clock,
   Target,
   Activity,
   RefreshCw,
+  FileText,
+  Calendar,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import StatsCard from '../components/ui/StatsCard';
@@ -28,6 +29,8 @@ import {
   BarElement,
 } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 ChartJS.register(
   ArcElement,
@@ -71,6 +74,9 @@ interface MonthlyData {
 }
 
 const Dashboard: React.FC = () => {
+  const { userRole } = useAuth();
+  const navigate = useNavigate();
+  
   const [stats, setStats] = useState<DashboardStats>({
     totalCustomers: 0,
     totalOrders: 0,
@@ -245,8 +251,123 @@ const Dashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    // Only fetch data for admin and user roles, not for sales
+    if (userRole === 'admin' || userRole === 'user') {
+      fetchDashboardData();
+    } else {
+      setLoading(false);
+    }
+  }, [userRole]);
+
+  // Sales Dashboard - Simple navigation cards
+  if (userRole === 'sales') {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-3">
+              <LayoutDashboard size={28} />
+              Sales Dashboard
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Welcome! Access your available features below
+            </p>
+          </div>
+        </div>
+
+        {/* Quick Access Cards for Sales Users */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/orders/sale')}>
+            <div className="p-6 text-center">
+              <div className="bg-blue-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <FileText size={32} className="text-blue-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Sale Orders</h3>
+              <p className="text-gray-600 mb-4">View and manage sale orders</p>
+              <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium">
+                Click to Access
+              </div>
+            </div>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/orders/sale/new')}>
+            <div className="p-6 text-center">
+              <div className="bg-green-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <ClipboardList size={32} className="text-green-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">New Sale Order</h3>
+              <p className="text-gray-600 mb-4">Create a new sale order</p>
+              <div className="bg-green-50 text-green-700 px-4 py-2 rounded-lg text-sm font-medium">
+                Click to Create
+              </div>
+            </div>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/scheduling')}>
+            <div className="p-6 text-center">
+              <div className="bg-purple-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <Calendar size={32} className="text-purple-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Scheduling</h3>
+              <p className="text-gray-600 mb-4">View and manage schedules</p>
+              <div className="bg-purple-50 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium">
+                Click to Access
+              </div>
+            </div>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow">
+            <div className="p-6 text-center">
+              <div className="bg-gray-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <Activity size={32} className="text-gray-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Your Role</h3>
+              <p className="text-gray-600 mb-4">Sales Representative</p>
+              <div className="bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">
+                Limited Access
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Quick Tips for Sales Users */}
+        <Card>
+          <div className="p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Tips</h3>
+            <div className="space-y-3 text-sm text-gray-600">
+              <div className="flex items-start space-x-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                <p>Use <strong>Sale Orders</strong> to view all your existing orders and their status</p>
+              </div>
+              <div className="flex items-start space-x-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                <p>Create <strong>New Sale Orders</strong> for customers with detailed measurements</p>
+              </div>
+              <div className="flex items-start space-x-2">
+                <div className="w-2 h-2 bg-purple-500 rounded-full mt-2"></div>
+                <p>Check <strong>Scheduling</strong> to see work assignments and timelines</p>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // Admin/User Dashboard - Full analytics
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-gray-700">
+            Loading Dashboard...
+          </h2>
+          <p className="text-gray-500 mt-2">Fetching your business insights</p>
+        </div>
+      </div>
+    );
+  }
 
   // Chart configurations
   const orderStatusChartData = {
@@ -410,20 +531,6 @@ const Dashboard: React.FC = () => {
     },
     cutout: '60%',
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold text-gray-700">
-            Loading Dashboard...
-          </h2>
-          <p className="text-gray-500 mt-2">Fetching your business insights</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
