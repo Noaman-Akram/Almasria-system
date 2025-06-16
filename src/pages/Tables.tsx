@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { ChevronDown, ChevronRight, RefreshCw, Database } from 'lucide-react';
+import { ChevronDown, ChevronRight, RefreshCw, Database, Users } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 
@@ -17,6 +17,19 @@ interface RelationInfo {
   foreign_column_name: string;
 }
 
+interface AuthUser {
+  id: string;
+  email: string;
+  created_at: string;
+  updated_at: string;
+  last_sign_in_at: string;
+  email_confirmed_at: string;
+  phone: string;
+  confirmed_at: string;
+  role: string;
+  aud: string;
+}
+
 const Tables: React.FC = () => {
   const [tables, setTables] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -27,6 +40,10 @@ const Tables: React.FC = () => {
   const [tableOffsets, setTableOffsets] = useState<Record<string, number>>({});
   const [hasMore, setHasMore] = useState<Record<string, boolean>>({});
   const [relations, setRelations] = useState<Record<string, RelationInfo[]>>({});
+  const [authUsers, setAuthUsers] = useState<AuthUser[]>([]);
+  const [authUsersExpanded, setAuthUsersExpanded] = useState(false);
+  const [authUsersLoading, setAuthUsersLoading] = useState(false);
+
   const fetchTables = async () => { 
     setLoading(true);
     try {
@@ -110,6 +127,38 @@ const Tables: React.FC = () => {
     }
   };
 
+  const fetchAuthUsers = async () => {
+    try {
+      setAuthUsersLoading(true);
+      
+      // Fetch auth users using the admin API
+      const { data, error } = await supabase.auth.admin.listUsers();
+      
+      if (error) {
+        console.error('Error fetching auth users:', error);
+        // Fallback: try to get current user info
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setAuthUsers([user as any]);
+        }
+      } else {
+        setAuthUsers(data.users as any);
+      }
+    } catch (err) {
+      console.error('Failed to fetch auth users:', err);
+      // Try alternative approach - get current session user
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setAuthUsers([user as any]);
+        }
+      } catch (sessionErr) {
+        console.error('Failed to get current user:', sessionErr);
+      }
+    } finally {
+      setAuthUsersLoading(false);
+    }
+  };
   
   const fetchRelations = async () => {
     try {
@@ -129,7 +178,6 @@ const Tables: React.FC = () => {
     }
   };
   
-  
   const loadMore = async (tableName: string) => {
     const currentOffset = tableOffsets[tableName] || 0;
     await fetchTableData(tableName, currentOffset);
@@ -140,6 +188,16 @@ const Tables: React.FC = () => {
       const newExpanded = { ...prev, [tableName]: !prev[tableName] };
       if (newExpanded[tableName] && !tableData[tableName]) {
         fetchTableData(tableName, 0);
+      }
+      return newExpanded;
+    });
+  };
+
+  const toggleAuthUsers = async () => {
+    setAuthUsersExpanded(prev => {
+      const newExpanded = !prev;
+      if (newExpanded && authUsers.length === 0) {
+        fetchAuthUsers();
       }
       return newExpanded;
     });
@@ -158,6 +216,20 @@ const Tables: React.FC = () => {
     );
   }
 
+  // Define auth users schema for display
+  const authUsersSchema = [
+    { column_name: 'id', data_type: 'uuid', is_nullable: 'NO' },
+    { column_name: 'email', data_type: 'text', is_nullable: 'YES' },
+    { column_name: 'created_at', data_type: 'timestamp with time zone', is_nullable: 'YES' },
+    { column_name: 'updated_at', data_type: 'timestamp with time zone', is_nullable: 'YES' },
+    { column_name: 'last_sign_in_at', data_type: 'timestamp with time zone', is_nullable: 'YES' },
+    { column_name: 'email_confirmed_at', data_type: 'timestamp with time zone', is_nullable: 'YES' },
+    { column_name: 'phone', data_type: 'text', is_nullable: 'YES' },
+    { column_name: 'confirmed_at', data_type: 'timestamp with time zone', is_nullable: 'YES' },
+    { column_name: 'role', data_type: 'text', is_nullable: 'YES' },
+    { column_name: 'aud', data_type: 'text', is_nullable: 'YES' },
+  ];
+
   return (
     <div className="container mx-auto p-4 space-y-6 max-w-7xl">
       {/* Schema Overview Section */}
@@ -168,6 +240,26 @@ const Tables: React.FC = () => {
             <h2 className="text-xl font-bold">Schema Overview</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Auth Users Schema */}
+            <div className="border rounded-lg p-3 bg-blue-50 border-blue-200">
+              <h3 className="font-medium text-blue-600 mb-2 flex items-center">
+                <Users className="h-4 w-4 mr-1" />
+                auth.users (Supabase Auth)
+              </h3>
+              <div className="text-sm text-gray-600 space-y-1">
+                {authUsersSchema.map((column) => (
+                  <div key={column.column_name} className="truncate">
+                    <span className="font-medium">• {column.column_name}</span>
+                    <span className="text-gray-500 ml-1">
+                      ({column.data_type}
+                      {column.is_nullable === 'YES' ? ', nullable' : ''})
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Regular Tables */}
             {tables.map((tableName) => (
               <div key={tableName} className="border rounded-lg p-3 bg-gray-50">
                 <h3 className="font-medium text-blue-600 mb-2">{tableName}</h3>
@@ -189,33 +281,33 @@ const Tables: React.FC = () => {
           </div>
         </div>
       </Card>
-{/* Relations Section */}
-<Card>
-  <div className="p-4">
-    <div className="flex items-center space-x-2 mb-4">
-      <Database className="h-5 w-5 text-blue-600" />
-      <h2 className="text-xl font-bold">Table Relationships</h2>
-    </div>
 
-    {Object.keys(relations).length === 0 ? (
-      <p className="text-sm text-gray-500">No relationships found.</p>
-    ) : (
-      <div className="text-sm text-gray-700 space-y-1">
-        {Object.entries(relations).map(([table, rels]) =>
-          rels.map((rel, idx) => (
-            <p key={`${table}-${idx}`}>
-              <strong>{rel.table_name}.{rel.column_name}</strong> →{' '}
-              <span className="text-blue-600">
-                {rel.foreign_table_name}.{rel.foreign_column_name}
-              </span>
-            </p>
-          ))
-        )}
-      </div>
-    )}
-  </div>
-</Card>
+      {/* Relations Section */}
+      <Card>
+        <div className="p-4">
+          <div className="flex items-center space-x-2 mb-4">
+            <Database className="h-5 w-5 text-blue-600" />
+            <h2 className="text-xl font-bold">Table Relationships</h2>
+          </div>
 
+          {Object.keys(relations).length === 0 ? (
+            <p className="text-sm text-gray-500">No relationships found.</p>
+          ) : (
+            <div className="text-sm text-gray-700 space-y-1">
+              {Object.entries(relations).map(([table, rels]) =>
+                rels.map((rel, idx) => (
+                  <p key={`${table}-${idx}`}>
+                    <strong>{rel.table_name}.{rel.column_name}</strong> →{' '}
+                    <span className="text-blue-600">
+                      {rel.foreign_table_name}.{rel.foreign_column_name}
+                    </span>
+                  </p>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      </Card>
 
       {/* Table List Section */}
       <Card>
@@ -237,6 +329,77 @@ const Tables: React.FC = () => {
           </div>
           
           <div className="space-y-2">
+            {/* Auth Users Table */}
+            <div className="border rounded-lg border-blue-200 bg-blue-50">
+              <button
+                onClick={toggleAuthUsers}
+                className="w-full p-3 flex items-center justify-between hover:bg-blue-100"
+              >
+                <span className="font-medium flex items-center text-blue-700">
+                  <Users className="h-4 w-4 mr-2" />
+                  auth.users (Supabase Authentication Users)
+                </span>
+                {authUsersExpanded ? (
+                  <ChevronDown className="h-5 w-5" />
+                ) : (
+                  <ChevronRight className="h-5 w-5" />
+                )}
+              </button>
+              
+              {authUsersExpanded && (
+                <div className="p-3 border-t border-blue-200">
+                  {authUsersLoading ? (
+                    <div className="text-center py-4 text-gray-500">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                      Loading auth users...
+                    </div>
+                  ) : authUsers.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead className="bg-blue-100">
+                          <tr>
+                            {authUsersSchema.map((column) => (
+                              <th
+                                key={column.column_name}
+                                className="px-3 py-2 text-left text-xs font-medium text-blue-700 uppercase tracking-wider"
+                              >
+                                <div className="flex flex-col">
+                                  <span>{column.column_name}</span>
+                                  <span className="text-blue-500 text-[10px]">
+                                    {column.data_type}
+                                    {column.is_nullable === 'YES' ? ' (nullable)' : ''}
+                                  </span>
+                                </div>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {authUsers.map((user, userIndex) => (
+                            <tr key={user.id || userIndex} className="hover:bg-blue-50">
+                              {authUsersSchema.map((column) => (
+                                <td
+                                  key={column.column_name}
+                                  className="px-3 py-2 whitespace-nowrap text-gray-600"
+                                >
+                                  {user[column.column_name as keyof AuthUser]?.toString() || 'null'}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500">
+                      No auth users found or insufficient permissions to view auth users.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Regular Tables */}
             {tables.map((tableName) => (
               <div key={tableName} className="border rounded-lg">
                 <button
@@ -330,4 +493,4 @@ const Tables: React.FC = () => {
   );
 };
 
-export default Tables; 
+export default Tables;
