@@ -56,8 +56,8 @@ const getUserRole = (email: string | undefined): string => {
     return 'admin';
   }
   
-  // Sales users
-  if (email === '7amza86@gmail.com') {
+  // Sales users (limited access to sale orders and scheduling only)
+  if (email === '7amza86@gmail.com' || email === 'islamashour000@gmail.com') {
     return 'sales';
   }
   
