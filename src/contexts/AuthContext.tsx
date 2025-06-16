@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 interface AuthContextType {
   session: Session | null;
   user: User | null;
+  userRole: string | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
@@ -12,6 +13,8 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<void>;
   confirmPasswordReset: (oobCode: string, newPassword: string) => Promise<void>;
   verifyEmail: (oobCode: string) => Promise<void>;
+  isSalesUser: () => boolean;
+  isAdminUser: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -31,7 +34,7 @@ const mockUser: User = {
   created_at: new Date().toISOString(),
   aud: 'authenticated',
   role: 'authenticated',
-  user_metadata: {},
+  user_metadata: { role: 'admin' },
   app_metadata: {},
   identities: [],
   last_sign_in_at: new Date().toISOString(),
@@ -44,9 +47,28 @@ const mockUser: User = {
   is_sso_user: false
 };
 
+// Function to determine user role based on email
+const getUserRole = (email: string | undefined): string => {
+  if (!email) return 'user';
+  
+  // Sales users
+  if (email === '7amza86@gmail.com') {
+    return 'sales';
+  }
+  
+  // Admin users (you can add more admin emails here)
+  if (email === 'admin@example.com' || email === 'test@example.com') {
+    return 'admin';
+  }
+  
+  // Default role
+  return 'user';
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -59,29 +81,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session) {
           setSession(session);
           setUser(session.user);
+          const role = getUserRole(session.user.email);
+          setUserRole(role);
+          // Update user metadata with role
+          const updatedUser = {
+            ...session.user,
+            user_metadata: { ...session.user.user_metadata, role }
+          };
+          setUser(updatedUser);
         } else {
           setSession(null);
-          setUser(mockUser);
+          const role = getUserRole(mockUser.email);
+          setUserRole(role);
+          const updatedMockUser = {
+            ...mockUser,
+            user_metadata: { ...mockUser.user_metadata, role }
+          };
+          setUser(updatedMockUser);
         }
         setLoading(false);
       });
     } else {
       // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
         setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+        if (session?.user) {
+          const role = getUserRole(session.user.email);
+          setUserRole(role);
+          // Update user metadata with role
+          const updatedUser = {
+            ...session.user,
+            user_metadata: { ...session.user.user_metadata, role }
+          };
+          setUser(updatedUser);
+        } else {
+          setUser(null);
+          setUserRole(null);
+        }
+        setLoading(false);
+      });
     }
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (isDevMode && !session) {
         setSession(null);
-        setUser(mockUser);
+        const role = getUserRole(mockUser.email);
+        setUserRole(role);
+        const updatedMockUser = {
+          ...mockUser,
+          user_metadata: { ...mockUser.user_metadata, role }
+        };
+        setUser(updatedMockUser);
       } else {
         setSession(session);
-      setUser(session?.user ?? null);
+        if (session?.user) {
+          const role = getUserRole(session.user.email);
+          setUserRole(role);
+          // Update user metadata with role
+          const updatedUser = {
+            ...session.user,
+            user_metadata: { ...session.user.user_metadata, role }
+          };
+          setUser(updatedUser);
+        } else {
+          setUser(null);
+          setUserRole(null);
+        }
       }
       setLoading(false);
     });
@@ -116,6 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Clear the current user
     setSession(null);
     setUser(null);
+    setUserRole(null);
   };
 
   const resetPassword = async (email: string) => {
@@ -142,9 +209,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) throw error;
   };
 
+  // Helper functions to check user roles
+  const isSalesUser = (): boolean => {
+    return userRole === 'sales';
+  };
+
+  const isAdminUser = (): boolean => {
+    return userRole === 'admin';
+  };
+
   const value = {
     session,
     user,
+    userRole,
     loading,
     signIn,
     signUp,
@@ -152,6 +229,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     resetPassword,
     confirmPasswordReset,
     verifyEmail,
+    isSalesUser,
+    isAdminUser,
   };
 
   return (
@@ -160,4 +239,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </AuthContext.Provider>
   );
 };
-
