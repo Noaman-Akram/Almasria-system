@@ -51,6 +51,11 @@ const mockUser: User = {
 const getUserRole = (email: string | undefined): string => {
   if (!email) return 'user';
   
+  // Super Admin users (full access to everything)
+  if (email === 'noemakram@gmail.com') {
+    return 'admin';
+  }
+  
   // Sales users
   if (email === '7amza86@gmail.com') {
     return 'sales';
