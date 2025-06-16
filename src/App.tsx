@@ -18,8 +18,11 @@ import NewWorkOrder from './pages/orders/NewWorkOrder';
 import Tables from './pages/Tables';
 import SchedulingPage from './pages/scheduling/SchedulingPage';
 
-const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth();
+const PrivateRoute: React.FC<{ children: React.ReactNode; allowedRoles?: string[] }> = ({ 
+  children, 
+  allowedRoles = ['admin', 'sales', 'user'] 
+}) => {
+  const { user, userRole, loading } = useAuth();
 
   if (loading) {
     return (
@@ -29,7 +32,16 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     );
   }
 
-  return user ? <>{children}</> : <Navigate to="/auth/login" />;
+  if (!user) {
+    return <Navigate to="/auth/login" />;
+  }
+
+  // Check if user role is allowed for this route
+  if (!allowedRoles.includes(userRole || 'user')) {
+    return <Navigate to="/" />;
+  }
+
+  return <>{children}</>;
 };
 
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -78,39 +90,24 @@ const AppRoutes: React.FC = () => {
     
       {/* Protected Routes */}
       <Route path="/" element={
-        <PrivateRoute>
+        <PrivateRoute allowedRoles={['admin', 'sales', 'user']}>
           <Layout>
             <Dashboard />
           </Layout>
         </PrivateRoute>
       } />
       
+      {/* Admin-only routes */}
       <Route path="/customers" element={
-        <PrivateRoute>
+        <PrivateRoute allowedRoles={['admin']}>
           <Layout>
             <CustomersList />
           </Layout>
         </PrivateRoute>
       } />
       
-      <Route path="/orders/sale" element={
-        <PrivateRoute>
-          <Layout>
-            <SaleOrdersList />
-          </Layout>
-        </PrivateRoute>
-      } />
-      
-      <Route path="/orders/sale/new" element={
-        <PrivateRoute>
-          <Layout>
-            <NewSaleOrder />
-          </Layout>
-        </PrivateRoute>
-      } />
-
       <Route path="/orders/work" element={
-        <PrivateRoute>
+        <PrivateRoute allowedRoles={['admin']}>
           <Layout>
             <WorkOrdersList />
           </Layout>
@@ -118,7 +115,7 @@ const AppRoutes: React.FC = () => {
       } />
 
       <Route path="/orders/work/new/:orderId?" element={
-        <PrivateRoute>
+        <PrivateRoute allowedRoles={['admin']}>
           <Layout>
             <NewWorkOrder />
           </Layout>
@@ -126,15 +123,40 @@ const AppRoutes: React.FC = () => {
       } />
 
       <Route path="/tables" element={
-        <PrivateRoute>
+        <PrivateRoute allowedRoles={['admin']}>
           <Layout>
             <Tables />
           </Layout>
         </PrivateRoute>
       } />
 
+      <Route path="/settings" element={
+        <PrivateRoute allowedRoles={['admin']}>
+          <Layout>
+            <UnderDevelopment />
+          </Layout>
+        </PrivateRoute>
+      } />
+      
+      {/* Sales and Admin routes */}
+      <Route path="/orders/sale" element={
+        <PrivateRoute allowedRoles={['admin', 'sales']}>
+          <Layout>
+            <SaleOrdersList />
+          </Layout>
+        </PrivateRoute>
+      } />
+      
+      <Route path="/orders/sale/new" element={
+        <PrivateRoute allowedRoles={['admin', 'sales']}>
+          <Layout>
+            <NewSaleOrder />
+          </Layout>
+        </PrivateRoute>
+      } />
+
       <Route path="/scheduling" element={
-        <PrivateRoute>
+        <PrivateRoute allowedRoles={['admin', 'sales']}>
           <Layout>
             <SchedulingPage />
           </Layout>
