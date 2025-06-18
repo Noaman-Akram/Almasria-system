@@ -1,7 +1,7 @@
 import React from 'react';
 import { Bell, Search, User, Menu, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import Button from '../ui/Button';
+import { Button } from '../components/ui/button';
 
 interface HeaderProps {
   onMenuClick: () => void;
