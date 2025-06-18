@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, Eye, Calendar, User, BadgeDollarSign, Tag } from 'lucide-react';
+import { Plus, Search, Filter, Eye, User, BadgeDollarSign, Tag } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import Button from '../../../components/ui/Button';
 import Card from '../../../components/ui/Card';
