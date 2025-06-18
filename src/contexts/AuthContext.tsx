@@ -52,7 +52,7 @@ const getUserRole = (email: string | undefined): string => {
   if (!email) return 'user';
   
   // Super Admin users (full access to everything)
-  if (email === 'noemakram@gmail.com') {
+  if (email === 'noemakram@gmail.com' || email === 'adam.adam199@icloud.com') {
     return 'admin';
   }
   
