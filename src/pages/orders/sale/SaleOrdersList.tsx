@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   PlusCircle,
@@ -15,7 +15,11 @@ import {
   Box,
   Ruler,
   Trash2,
-  Calculator
+  Calculator,
+  Copy,
+  X,
+  Check,
+  Download
 } from 'lucide-react';
 import Button from '../../../components/ui/Button';
 import Card from '../../../components/ui/Card';
@@ -44,6 +48,20 @@ const SaleOrdersList = () => {
   const [editMeasurements, setEditMeasurements] = useState<any[]>([]);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editToast, setEditToast] = useState<{ type: 'success' | 'error' | 'info', message: string } | null>(null);
+  
+  // Copy modal states
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [copyOrder, setCopyOrder] = useState<any | null>(null);
+  const [copyOptions, setCopyOptions] = useState({
+    customerInfo: true,
+    orderDetails: true,
+    workTypes: true,
+    measurements: true,
+    orderSummary: true,
+    timestamps: false
+  });
+  const [copying, setCopying] = useState(false);
+  const copyPreviewRef = useRef<HTMLDivElement>(null);
 
   const toggleOrder = async (orderId: number) => {
     if (expandedOrder === orderId) {
@@ -144,8 +162,6 @@ const SaleOrdersList = () => {
     const date = new Date(dateStr);
     return date.toLocaleString('en-GB', { timeZone: 'Africa/Cairo', hour12: false });
   };
-
-  // Helper to render order summary
 
   // Open edit modal and prefill form
   const handleEditOrder = async (order: any) => {
@@ -305,81 +321,405 @@ const SaleOrdersList = () => {
     }
   };
 
-  const handlePrintOrder = (order: any) => {
-    const measurements = orderMeasurements[order.id] || [];
-   
-    const printWindow = window.open('');
-    if (!printWindow) return;
-  
-    printWindow.document.write(`
-      <html>
+  // Open copy modal
+  const handleCopyOrder = (order: any) => {
+    setCopyOrder(order);
+    setShowCopyModal(true);
+  };
+
+  // Handle copy options change
+  const handleCopyOptionChange = (option: string, value: boolean) => {
+    setCopyOptions(prev => ({ ...prev, [option]: value }));
+  };
+
+  // Copy order as text to clipboard
+  const handleCopyAsText = async () => {
+    if (!copyOrder) return;
+    
+    setCopying(true);
+    try {
+      const measurements = orderMeasurements[copyOrder.id] || [];
+      let textContent = `ORDER SUMMARY - ${copyOrder.code}\n`;
+      textContent += '='.repeat(50) + '\n\n';
+
+      if (copyOptions.customerInfo) {
+        textContent += 'CUSTOMER INFORMATION:\n';
+        textContent += `-`.repeat(25) + '\n';
+        textContent += `Name: ${copyOrder.customer_name}\n`;
+        textContent += `Company: ${copyOrder.company || 'N/A'}\n`;
+        textContent += `Address: ${copyOrder.address}\n\n`;
+      }
+
+      if (copyOptions.orderDetails) {
+        textContent += 'ORDER DETAILS:\n';
+        textContent += `-`.repeat(25) + '\n';
+        textContent += `Order ID: #${copyOrder.id}\n`;
+        textContent += `Status: ${copyOrder.order_status}\n`;
+        textContent += `Sales Person: ${copyOrder.sales_person || 'N/A'}\n`;
+        textContent += `Order Price: ${copyOrder.order_price} EGP\n`;
+        if (copyOrder.discount) {
+          textContent += `Discount: ${copyOrder.discount} EGP\n`;
+        }
+        textContent += '\n';
+      }
+
+      if (copyOptions.workTypes) {
+        textContent += 'WORK TYPES:\n';
+        textContent += `-`.repeat(25) + '\n';
+        const types = Array.isArray(copyOrder.work_types) ? copyOrder.work_types : String(copyOrder.work_types).split(',');
+        types.forEach((type: string) => {
+          textContent += `• ${type}\n`;
+        });
+        textContent += '\n';
+      }
+
+      if (copyOptions.measurements && measurements.length > 0) {
+        textContent += 'MEASUREMENTS:\n';
+        textContent += `-`.repeat(25) + '\n';
+        measurements.forEach((item: any, idx: number) => {
+          textContent += `${idx + 1}. ${item.material_name}\n`;
+          textContent += `   Type: ${item.material_type}\n`;
+          textContent += `   Quantity: ${item.quantity} ${item.unit}\n`;
+          textContent += `   Unit Price: ${item.price} EGP\n`;
+          textContent += `   Total: ${item.total_price} EGP\n\n`;
+        });
+      }
+
+      if (copyOptions.orderSummary) {
+        textContent += 'SUMMARY:\n';
+        textContent += `-`.repeat(25) + '\n';
+        textContent += `Total Amount: ${copyOrder.order_price} EGP\n`;
+        if (copyOrder.discount) {
+          textContent += `Discount Applied: -${copyOrder.discount} EGP\n`;
+        }
+        textContent += '\n';
+      }
+
+      if (copyOptions.timestamps) {
+        textContent += 'TIMESTAMPS:\n';
+        textContent += `-`.repeat(25) + '\n';
+        textContent += `Created: ${formatDateTimeCairo(copyOrder.created_at)}\n`;
+        textContent += `Updated: ${formatDateTimeCairo(copyOrder.updated_at)}\n`;
+      }
+
+      await navigator.clipboard.writeText(textContent);
+      alert('Order details copied to clipboard as text!');
+      setShowCopyModal(false);
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+      alert('Failed to copy to clipboard. Please try again.');
+    } finally {
+      setCopying(false);
+    }
+  };
+
+  // Download order as HTML file
+  const handleDownloadAsHTML = () => {
+    if (!copyOrder) return;
+    
+    setCopying(true);
+    try {
+      const measurements = orderMeasurements[copyOrder.id] || [];
+      
+      let htmlContent = `
+        <!DOCTYPE html>
+        <html lang="en">
         <head>
-          <title>Order #${order.code} - Print</title>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Order ${copyOrder.code} - Summary</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 32px; color: #222; }
-            h2 { color: #2563eb; margin-bottom: 24px; }
-            .section { margin-bottom: 32px; }
-            .section-title { font-size: 1.2rem; font-weight: bold; color: #2563eb; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
-            .info-row { display: flex; margin-bottom: 8px; }
-            .info-label { width: 180px; font-weight: 500; color: #555; }
-            .info-value { flex: 1; }
-            .work-types { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
-            .work-type { background: #e0e7ff; color: #3730a3; padding: 4px 12px; border-radius: 999px; font-size: 0.95rem; font-weight: 500; }
-            .items-list { margin-bottom: 8px; }
-            .item-card { background: #f3f4f6; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; }
-            .item-title { font-weight: 600; color: #0f172a; margin-bottom: 4px; }
-            .item-details { font-size: 0.97rem; color: #444; }
-            .summary-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-top: 24px; }
-            .summary-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 1.08rem; }
-            .summary-label { color: #166534; font-weight: 500; }
-            .summary-value { font-weight: bold; }
+            body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; color: #333; }
+            .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; }
+            .header h1 { color: #2563eb; margin: 0; }
+            .header p { color: #6b7280; margin: 5px 0; }
+            .section { margin-bottom: 30px; }
+            .section-title { color: #2563eb; font-size: 1.2em; font-weight: bold; margin-bottom: 15px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; }
+            .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+            .info-item { margin-bottom: 8px; }
+            .info-label { font-weight: bold; color: #374151; }
+            .work-types { display: flex; flex-wrap: wrap; gap: 8px; }
+            .work-type { background: #dbeafe; color: #1d4ed8; padding: 4px 12px; border-radius: 20px; font-size: 0.9em; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; }
+            th { background: #f3f4f6; font-weight: bold; }
+            .summary-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 20px; }
+            .summary-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
+            .summary-label { font-weight: bold; }
+            .summary-value { font-weight: bold; color: #2563eb; }
+            @media print { body { margin: 0; } }
           </style>
         </head>
         <body>
-          <h2>Order Summary - ${order.code}</h2>
-          <div class="section">
-            <div class="section-title">Order Details</div>
-            <div class="info-row"><div class="info-label">Order Code:</div><div class="info-value">${order.code}</div></div>
-            <div class="info-row"><div class="info-label">Status:</div><div class="info-value">${order.order_status}</div></div>
-            <div class="info-row"><div class="info-label">Created At:</div><div class="info-value">${order.created_at}</div></div>
+          <div class="header">
+            <h1>Order Summary</h1>
+            <p>Order Code: ${copyOrder.code}</p>
           </div>
+      `;
+
+      if (copyOptions.customerInfo) {
+        htmlContent += `
           <div class="section">
             <div class="section-title">Customer Information</div>
-            <div class="info-row"><div class="info-label">Name:</div><div class="info-value">${order.customer_name}</div></div>
-            <div class="info-row"><div class="info-label">Company:</div><div class="info-value">${order.company || '-'}</div></div>
-            <div class="info-row"><div class="info-label">Address:</div><div class="info-value">${order.address}</div></div>
+            <div class="info-grid">
+              <div class="info-item"><span class="info-label">Name:</span> ${copyOrder.customer_name}</div>
+              <div class="info-item"><span class="info-label">Company:</span> ${copyOrder.company || 'N/A'}</div>
+              <div class="info-item" style="grid-column: 1 / -1;"><span class="info-label">Address:</span> ${copyOrder.address}</div>
+            </div>
           </div>
+        `;
+      }
+
+      if (copyOptions.orderDetails) {
+        htmlContent += `
+          <div class="section">
+            <div class="section-title">Order Details</div>
+            <div class="info-grid">
+              <div class="info-item"><span class="info-label">Order ID:</span> #${copyOrder.id}</div>
+              <div class="info-item"><span class="info-label">Status:</span> ${copyOrder.order_status}</div>
+              <div class="info-item"><span class="info-label">Sales Person:</span> ${copyOrder.sales_person || 'N/A'}</div>
+              <div class="info-item"><span class="info-label">Order Price:</span> ${copyOrder.order_price} EGP</div>
+              ${copyOrder.discount ? `<div class="info-item"><span class="info-label">Discount:</span> ${copyOrder.discount} EGP</div>` : ''}
+            </div>
+          </div>
+        `;
+      }
+
+      if (copyOptions.workTypes) {
+        const types = Array.isArray(copyOrder.work_types) ? copyOrder.work_types : String(copyOrder.work_types).split(',');
+        htmlContent += `
           <div class="section">
             <div class="section-title">Work Types</div>
             <div class="work-types">
-              ${(Array.isArray(order.work_types) ? order.work_types : String(order.work_types).split(',')).map((type: string) => `<span class="work-type">${type}</span>`).join('')}
+              ${types.map((type: string) => `<span class="work-type">${type}</span>`).join('')}
             </div>
           </div>
+        `;
+      }
+
+      if (copyOptions.measurements && measurements.length > 0) {
+        htmlContent += `
           <div class="section">
             <div class="section-title">Measurements</div>
-            <div class="items-list">
-              ${measurements.map((item, idx) => `
-                <div class="item-card">
-                  <div class="item-title">Item ${idx + 1}: ${item.material_name}</div>
-                  <div class="item-details">
-                    <div>Type: ${item.material_type}</div>
-                    <div>Unit: ${item.unit}</div>
-                    <div>Quantity: ${item.quantity}</div>
-                    <div>Unit Price: ${item.price} EGP</div>
-                    <div>Total Price: ${item.total_price} EGP</div>
-                  </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Material</th>
+                  <th>Type</th>
+                  <th>Quantity</th>
+                  <th>Unit Price</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${measurements.map((item: any) => `
+                  <tr>
+                    <td>${item.material_name}</td>
+                    <td>${item.material_type}</td>
+                    <td>${item.quantity} ${item.unit}</td>
+                    <td>${item.price} EGP</td>
+                    <td>${item.total_price} EGP</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      if (copyOptions.orderSummary) {
+        htmlContent += `
+          <div class="section">
+            <div class="section-title">Summary</div>
+            <div class="summary-box">
+              <div class="summary-row">
+                <span class="summary-label">Total Amount:</span>
+                <span class="summary-value">${copyOrder.order_price} EGP</span>
+              </div>
+              ${copyOrder.discount ? `
+                <div class="summary-row">
+                  <span class="summary-label">Discount Applied:</span>
+                  <span class="summary-value">-${copyOrder.discount} EGP</span>
                 </div>
-              `).join('')}
+              ` : ''}
             </div>
           </div>
-          <div class="summary-box">
-            <div class="summary-row"><span class="summary-label">Order Price:</span><span class="summary-value">${order.order_price} EGP</span></div>
-    </div>
-          <script>window.onload = function() { window.print(); };</script>
+        `;
+      }
+
+      if (copyOptions.timestamps) {
+        htmlContent += `
+          <div class="section">
+            <div class="section-title">Timestamps</div>
+            <div class="info-grid">
+              <div class="info-item"><span class="info-label">Created:</span> ${formatDateTimeCairo(copyOrder.created_at)}</div>
+              <div class="info-item"><span class="info-label">Updated:</span> ${formatDateTimeCairo(copyOrder.updated_at)}</div>
+            </div>
+          </div>
+        `;
+      }
+
+      htmlContent += `
         </body>
-      </html>
-    `);
-    printWindow.document.close();
+        </html>
+      `;
+
+      // Create and download the file
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `order-${copyOrder.code}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      alert('Order details downloaded as HTML file!');
+      setShowCopyModal(false);
+    } catch (error) {
+      console.error('Error creating HTML file:', error);
+      alert('Failed to create HTML file. Please try again.');
+    } finally {
+      setCopying(false);
+    }
+  };
+
+  // Render copy preview
+  const renderCopyPreview = () => {
+    if (!copyOrder) return null;
+    
+    const measurements = orderMeasurements[copyOrder.id] || [];
+    
+    return (
+      <div ref={copyPreviewRef} className="bg-white p-6 border border-gray-200 rounded-lg">
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="text-center border-b pb-4">
+            <h2 className="text-2xl font-bold text-gray-900">Order Summary</h2>
+            <p className="text-lg text-blue-600 font-mono">{copyOrder.code}</p>
+          </div>
+
+          {/* Customer Information */}
+          {copyOptions.customerInfo && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                <User className="h-5 w-5 mr-2 text-blue-600" />
+                Customer Information
+              </h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div><span className="font-medium">Name:</span> {copyOrder.customer_name}</div>
+                <div><span className="font-medium">Company:</span> {copyOrder.company || 'N/A'}</div>
+                <div className="col-span-2"><span className="font-medium">Address:</span> {copyOrder.address}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Order Details */}
+          {copyOptions.orderDetails && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                <Receipt className="h-5 w-5 mr-2 text-blue-600" />
+                Order Details
+              </h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div><span className="font-medium">Order ID:</span> #{copyOrder.id}</div>
+                <div><span className="font-medium">Status:</span> {copyOrder.order_status}</div>
+                <div><span className="font-medium">Sales Person:</span> {copyOrder.sales_person || 'N/A'}</div>
+                <div><span className="font-medium">Order Price:</span> {copyOrder.order_price} EGP</div>
+                {copyOrder.discount && (
+                  <div><span className="font-medium">Discount:</span> {copyOrder.discount} EGP</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Work Types */}
+          {copyOptions.workTypes && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                <Box className="h-5 w-5 mr-2 text-blue-600" />
+                Work Types
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {(Array.isArray(copyOrder.work_types) ? copyOrder.work_types : String(copyOrder.work_types).split(',')).map((type: string, idx: number) => (
+                  <span key={idx} className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
+                    {type}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Measurements */}
+          {copyOptions.measurements && measurements.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                <Ruler className="h-5 w-5 mr-2 text-blue-600" />
+                Measurements
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full border border-gray-200 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="border border-gray-200 px-3 py-2 text-left font-medium">Material</th>
+                      <th className="border border-gray-200 px-3 py-2 text-left font-medium">Type</th>
+                      <th className="border border-gray-200 px-3 py-2 text-left font-medium">Quantity</th>
+                      <th className="border border-gray-200 px-3 py-2 text-left font-medium">Unit Price</th>
+                      <th className="border border-gray-200 px-3 py-2 text-left font-medium">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {measurements.map((item: any, idx: number) => (
+                      <tr key={idx}>
+                        <td className="border border-gray-200 px-3 py-2">{item.material_name}</td>
+                        <td className="border border-gray-200 px-3 py-2">{item.material_type}</td>
+                        <td className="border border-gray-200 px-3 py-2">{item.quantity} {item.unit}</td>
+                        <td className="border border-gray-200 px-3 py-2">{item.price} EGP</td>
+                        <td className="border border-gray-200 px-3 py-2 font-medium">{item.total_price} EGP</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Order Summary */}
+          {copyOptions.orderSummary && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                <Calculator className="h-5 w-5 mr-2 text-blue-600" />
+                Summary
+              </h3>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex justify-between items-center text-lg">
+                  <span className="font-medium">Total Amount:</span>
+                  <span className="font-bold text-blue-600">{copyOrder.order_price} EGP</span>
+                </div>
+                {copyOrder.discount && (
+                  <div className="flex justify-between items-center text-sm text-gray-600 mt-1">
+                    <span>Discount Applied:</span>
+                    <span>-{copyOrder.discount} EGP</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Timestamps */}
+          {copyOptions.timestamps && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Timestamps</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                <div><span className="font-medium">Created:</span> {formatDateTimeCairo(copyOrder.created_at)}</div>
+                <div><span className="font-medium">Updated:</span> {formatDateTimeCairo(copyOrder.updated_at)}</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -526,10 +866,11 @@ const SaleOrdersList = () => {
                           size="sm"
                           onClick={e => {
                             e.stopPropagation();
-                            handlePrintOrder(order);
+                            handleCopyOrder(order);
                           }}
                         >
-                          Print
+                          <Copy className="h-4 w-4 mr-1" />
+                          Copy
                         </Button>
                         <Button
                           variant="outline"
@@ -567,6 +908,104 @@ const SaleOrdersList = () => {
           </button>
         )}
       </div>
+
+      {/* Copy Order Modal */}
+      {showCopyModal && (
+        <Modal open={showCopyModal} onClose={() => setShowCopyModal(false)}>
+          <div className="max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">Copy Order Details</h2>
+                <button
+                  onClick={() => setShowCopyModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Options Panel */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Select what to include:</h3>
+                  
+                  <div className="space-y-3">
+                    {[
+                      { key: 'customerInfo', label: 'Customer Information', icon: User },
+                      { key: 'orderDetails', label: 'Order Details', icon: Receipt },
+                      { key: 'workTypes', label: 'Work Types', icon: Box },
+                      { key: 'measurements', label: 'Measurements', icon: Ruler },
+                      { key: 'orderSummary', label: 'Order Summary', icon: Calculator },
+                      { key: 'timestamps', label: 'Timestamps', icon: null }
+                    ].map(({ key, label, icon: Icon }) => (
+                      <label key={key} className="flex items-center space-x-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={copyOptions[key as keyof typeof copyOptions]}
+                          onChange={(e) => handleCopyOptionChange(key, e.target.checked)}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <div className="flex items-center space-x-2">
+                          {Icon && <Icon size={16} className="text-gray-500" />}
+                          <span className="text-sm font-medium text-gray-700">{label}</span>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="pt-4 border-t space-y-3">
+                    <Button
+                      onClick={handleCopyAsText}
+                      disabled={copying}
+                      className="w-full flex items-center justify-center space-x-2"
+                      variant="outline"
+                    >
+                      {copying ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                          <span>Copying...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={16} />
+                          <span>Copy as Text</span>
+                        </>
+                      )}
+                    </Button>
+                    
+                    <Button
+                      onClick={handleDownloadAsHTML}
+                      disabled={copying}
+                      className="w-full flex items-center justify-center space-x-2"
+                    >
+                      {copying ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <span>Creating File...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download size={16} />
+                          <span>Download as HTML</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Preview Panel */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Preview:</h3>
+                  <div className="border border-gray-200 rounded-lg overflow-hidden max-h-96 overflow-y-auto">
+                    {renderCopyPreview()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {/* Edit Order Modal */}
       {showEditModal && (
         <Modal open={showEditModal} onClose={() => setShowEditModal(false)}>
