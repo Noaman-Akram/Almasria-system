@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Users, Settings, ChevronRight, ChevronLeft, FileText, Hammer, LogOut, Database, Calendar, Plus } from 'lucide-react';
 import { NavItem } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import Button from '../ui/Button';
+import { Button } from '../components/ui/button';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -161,12 +161,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         {!collapsed && (
           <div className="space-y-4">
             <div className="text-xs text-gray-400">
-              <div>Version 1.0.0</div>
+              <div>Version 1.0.4</div>
               <div className="mt-1">
                 Role: <span className="text-blue-400 font-medium">{userRole || 'user'}</span>
               </div>
               <div className="mt-1 truncate">
                 {user?.email}
+              </div>
+              <div className="mt-2 text-[10px] text-gray-500">
+                Powered by AppVert
               </div>
             </div>
             <Button
