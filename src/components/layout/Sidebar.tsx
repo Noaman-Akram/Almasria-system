@@ -52,6 +52,7 @@ const allNavItems: NavItem[] = [
 const rolePermissions = {
   admin: ['/', '/customers', '/orders/sale', '/orders/work', '/scheduling', '/tables', '/settings'],
   sales: ['/', '/orders/sale', '/scheduling'], // Sales users can only access dashboard, sale orders, and scheduling
+  internal: ['/', '/orders/work', '/scheduling'], // Sales users can only access dashboard, sale orders, and scheduling
   user: ['/', '/orders/sale'] // Default users get minimal access
 };
 
@@ -114,7 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                             (item.path !== '/' && location.pathname.startsWith(item.path));
               const isWorkOrders = item.path === '/orders/work';
               const isSaleOrders = item.path === '/orders/sale';
-              const canCreateNew = userRole === 'admin' || userRole === 'sales'; // Both admin and sales can create orders
+              const canCreateNew = userRole === 'admin' || userRole === 'sales' || userRole === 'internal'; // Both admin and sales can create orders
               
               return (
                 <li key={item.path} className="group flex items-center">

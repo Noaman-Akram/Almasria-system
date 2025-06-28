@@ -12,7 +12,7 @@ import {
   Ruler,
   Box,
   Loader2,
-  Printer
+  Copy
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -181,8 +181,8 @@ const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
 
     // Validate measurements
     for (const m of measurements) {
-      if (m.quantity <= 1) {
-        setToast({ type: 'error', message: 'Quantity must be greater than 1' });
+      if (m.quantity <= 0) {
+        setToast({ type: 'error', message: 'Quantity must be greater than 0' });
         return;
       }
       if (m.cost < 0) {
@@ -236,7 +236,7 @@ const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
               phone_number: customer.phone_number,
               address: `${customer.city} - ${customer.address_details}`
             }
-          : realCustomers.find((c) => c.id === order.customer_id)!,
+          : selectedCustomer, // Use the full selected customer object
         order: {
           customer_id: order.customer_id || 0,
           customer_name: isNewCustomer ? customer.name : (selectedCustomer?.name || ''),
@@ -305,80 +305,37 @@ const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
     });
   }, []);
 
-
-  const handlePrint = () => {
+  const handleCopyToClipboard = () => {
     if (!lastOrderSummary) return;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Order Summary - Order #${lastOrderSummary.id}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 32px; color: #222; }
-            h2 { color: #16a34a; margin-bottom: 24px; }
-            .section { margin-bottom: 32px; }
-            .section-title { font-size: 1.2rem; font-weight: bold; color: #2563eb; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
-            .info-row { display: flex; margin-bottom: 8px; }
-            .info-label { width: 180px; font-weight: 500; color: #555; }
-            .info-value { flex: 1; }
-            .work-types, .items-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
-            .work-type { background: #e0e7ff; color: #3730a3; padding: 4px 12px; border-radius: 999px; font-size: 0.95rem; font-weight: 500; }
-            .item-card { background: #f3f4f6; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; }
-            .item-title { font-weight: 600; color: #0f172a; margin-bottom: 4px; }
-            .item-details { font-size: 0.97rem; color: #444; }
-            .summary-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-top: 24px; }
-            .summary-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 1.08rem; }
-            .summary-label { color: #166534; font-weight: 500; }
-            .summary-value { font-weight: bold; }
-          </style>
-        </head>
-        <body>
-          <h2>Order Created Successfully!</h2>
-          <div class="section">
-            <div class="section-title">Order Details</div>
-            <div class="info-row"><div class="info-label">Order ID:</div><div class="info-value">${lastOrderSummary.id}</div></div>
-            <div class="info-row"><div class="info-label">Order Code:</div><div class="info-value">${lastOrderSummary.code}</div></div>
-            <div class="info-row"><div class="info-label">Status:</div><div class="info-value">${lastOrderSummary.order_status}</div></div>
-          </div>
-          <div class="section">
-            <div class="section-title">Customer Information</div>
-            <div class="info-row"><div class="info-label">Name:</div><div class="info-value">${lastOrderSummary.customer_name}</div></div>
-            <div class="info-row"><div class="info-label">Company:</div><div class="info-value">${lastOrderSummary.company || '-'}</div></div>
-            <div class="info-row"><div class="info-label">Phone:</div><div class="info-value">${lastOrderSummary.phone_number || '-'}</div></div>
-            <div class="info-row"><div class="info-label">Address:</div><div class="info-value">${lastOrderSummary.address}</div></div>
-          </div>
-          <div class="section">
-            <div class="section-title">Work Types</div>
-            <div class="work-types">
-              ${(lastOrderSummary.work_types || []).map((type: string) => `<span class="work-type">${type}</span>`).join('')}
-            </div>
-          </div>
-          <div class="section">
-            <div class="section-title">Order Items</div>
-            <div class="items-list">
-              ${(lastOrderSummary.items || []).map((item: any, idx: number) => `
-                <div class="item-card">
-                  <div class="item-title">Item ${idx + 1}: ${item.material_name}</div>
-                  <div class="item-details">
-                    <div>Type: ${item.material_type}</div>
-                    <div>Unit: ${item.unit}</div>
-                    <div>Quantity: ${item.quantity}</div>
-                    <div>Unit Cost: ${item.cost} EGP</div>
-                    <div>Total Cost: ${item.total_cost} EGP</div>
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-          <div class="summary-box">
-            <div className="summary-row"><span class="summary-label">Order Price:</span><span class="summary-value">${lastOrderSummary.order_price} EGP</span></div>
-          </div>
-          <script>window.onload = function() { window.print(); };</script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    
+    const orderText = `Order Created Successfully!
+
+Order Details:
+- Order ID: ${lastOrderSummary.id}
+- Order Code: ${lastOrderSummary.code}
+- Customer: ${lastOrderSummary.customer_name}
+- Company: ${lastOrderSummary.company || 'N/A'}
+- Address: ${lastOrderSummary.address}
+- Status: ${lastOrderSummary.order_status}
+- Sales Person: ${lastOrderSummary.sales_person || 'N/A'}
+
+Work Types: ${(lastOrderSummary.work_types || []).join(', ')}
+
+Order Items:
+${(lastOrderSummary.items || []).map((item: any, idx: number) => 
+  `${idx + 1}. ${item.material_name} (${item.material_type})
+   - Quantity: ${item.quantity} ${item.unit}
+   - Unit Cost: ${item.cost} EGP
+   - Total: ${item.total_cost} EGP`
+).join('\n')}
+
+Order Price: ${lastOrderSummary.order_price} EGP`;
+
+    navigator.clipboard.writeText(orderText).then(() => {
+      setToast({ type: 'success', message: 'Order details copied to clipboard!' });
+    }).catch(() => {
+      setToast({ type: 'error', message: 'Failed to copy to clipboard' });
+    });
   };
 
   return (
@@ -420,7 +377,7 @@ const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
                       <User className="h-5 w-5 text-gray-400" />
                     </div>
                     <select
-                      value={order.customer_id}
+                      value={order.customer_id || ''}
                       onChange={(e) => {
                         const selected = realCustomers.find((c) => c.id === Number(e.target.value));
                         setOrder({ ...order, customer_id: Number(e.target.value) });
@@ -623,7 +580,7 @@ const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
                         type="text"
                         value={measurement.material_name}
                         onChange={(e) => updateMeasurement(index, 'material_name', e.target.value)}
-                        className="mt-1 block w-full py-3 text-lg rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                        className="mt-1 block w-full px-6 py-3 text-lg rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
                         required
                       />
                     </div>
@@ -650,11 +607,12 @@ const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
                       <label className="block text-sm font-medium text-gray-700">Quantity *</label>
                       <input
                         type="number"
+                        step="0.01"
                         value={measurement.quantity}
-                        onChange={(e) => updateMeasurement(index, 'quantity', parseInt(e.target.value))}
-                        className="mt-1 block w-full py-3 text-lg rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                        onChange={(e) => updateMeasurement(index, 'quantity', parseFloat(e.target.value) || 0)}
+                        className="mt-1 block w-full px-6 py-3 text-lg rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
                         required
-                        min="1"
+                        min="0.01"
                       />
                     </div>
 
@@ -662,9 +620,10 @@ const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
                       <label className="block text-sm font-medium text-gray-700">Price per Unit (EGP) *</label>
                       <input
                         type="number"
+                        step="0.01"
                         value={measurement.cost}
-                        onChange={(e) => updateMeasurement(index, 'cost', parseInt(e.target.value))}
-                        className="mt-1 block w-full py-3 text-lg rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                        onChange={(e) => updateMeasurement(index, 'cost', parseFloat(e.target.value) || 0)}
+                        className="mt-1 block w-full px-6 py-3 text-lg rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
                         required
                         min="0"
                       />
@@ -684,17 +643,6 @@ const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
             </div>
                         
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-{/*               <div className="relative">
-                <label className="block text-sm font-medium text-gray-700">Order Price (EGP) *</label>
-                <input
-                  type="number"
-                  value={order.order_price}
-                  onChange={(e) => setOrder({ ...order, order_price: parseInt(e.target.value) })}
-                  className="mt-1 block w-full py-3 text-lg rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                  min="0"
-                />
-              </div> */}
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700">Sales Person *</label>
                 <select
@@ -723,8 +671,9 @@ const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
                 <label className="block text-sm font-medium text-gray-700">Discount (EGP)</label>
                 <input
                   type="number"
+                  step="0.01"
                   value={order.discount || ''}
-                  onChange={(e) => setOrder({ ...order, discount: parseInt(e.target.value) })}
+                  onChange={(e) => setOrder({ ...order, discount: parseFloat(e.target.value) || 0 })}
                   className="mt-1 block w-full py-3 text-lg rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -733,10 +682,6 @@ const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
 
 
             <div className="bg-gray-50 rounded-lg p-6 space-y-4">
-{/*               <div className="flex items-center justify-between text-lg">
-                <span className="font-medium text-gray-700">Order Price (input):</span>
-                <span className="font-bold text-blue-600">{order.order_price.toLocaleString()} EGP</span>
-              </div> */}
               <div className="flex items-center justify-between text-lg">
                 <span className="font-medium text-gray-700">Total Price:</span>
                 <span className="text-black-600">{totals.totalCost.toLocaleString()} EGP</span>
@@ -790,13 +735,12 @@ const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
           <div className="flex flex-col gap-3 mt-6">
             <Button className="w-full"   onClick={() => { 
               setShowSuccessModal(false);
-      window.location.reload(); // Reload current page
-
+              window.location.reload(); // Reload current page
             }}>
               Close
             </Button>
-            <Button className="w-full" variant="outline" onClick={handlePrint}>
-              <Printer className="inline-block mr-2" /> Print
+            <Button className="w-full" variant="outline" onClick={handleCopyToClipboard}>
+              <Copy className="inline-block mr-2" /> Copy Details
             </Button>
           </div>
         </div>

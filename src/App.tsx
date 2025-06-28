@@ -20,7 +20,7 @@ import SchedulingPage from './pages/scheduling/SchedulingPage';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode; allowedRoles?: string[] }> = ({ 
   children, 
-  allowedRoles = ['admin', 'sales', 'user'] 
+  allowedRoles = ['admin', 'sales', 'user', 'internal'] 
 }) => {
   const { user, userRole, loading } = useAuth();
 
@@ -90,7 +90,7 @@ const AppRoutes: React.FC = () => {
     
       {/* Protected Routes */}
       <Route path="/" element={
-        <PrivateRoute allowedRoles={['admin', 'sales', 'user']}>
+        <PrivateRoute allowedRoles={['admin', 'sales', 'user', 'internal']}>
           <Layout>
             <Dashboard />
           </Layout>
@@ -107,7 +107,7 @@ const AppRoutes: React.FC = () => {
       } />
       
       <Route path="/orders/work" element={
-        <PrivateRoute allowedRoles={['admin']}>
+        <PrivateRoute allowedRoles={['admin', 'internal']}>
           <Layout>
             <WorkOrdersList />
           </Layout>
@@ -115,7 +115,7 @@ const AppRoutes: React.FC = () => {
       } />
 
       <Route path="/orders/work/new/:orderId?" element={
-        <PrivateRoute allowedRoles={['admin']}>
+        <PrivateRoute allowedRoles={['admin', 'internal']}>
           <Layout>
             <NewWorkOrder />
           </Layout>
@@ -156,7 +156,7 @@ const AppRoutes: React.FC = () => {
       } />
 
       <Route path="/scheduling" element={
-        <PrivateRoute allowedRoles={['admin', 'sales']}>
+        <PrivateRoute allowedRoles={['admin', 'sales', 'internal']}>
           <Layout>
             <SchedulingPage />
           </Layout>

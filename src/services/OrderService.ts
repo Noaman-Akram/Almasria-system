@@ -6,6 +6,12 @@ export class OrderService {
     customer: CreateOrderDTO['customer']
   ): Promise<Customer> {
     console.log('[OrderService] upsertCustomer input:', customer);
+    
+    // If customer has an id, it's an existing customer - just return it
+    if ('id' in customer && customer.id) {
+      return customer as Customer;
+    }
+    
     // Try to find existing customer by name and phone_number
     const { data: existing, error: findError } = await supabase
       .from('customers')
