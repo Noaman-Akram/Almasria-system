@@ -102,7 +102,7 @@ const GoogleTranslate: React.FC = () => {
       </div>
 
       {/* Enhanced CSS to style Google Translate when it appears */}
-      <style jsx>{`
+      <style>{`
         /* Show Google Translate elements when our dropdown is open */
         .google-translate-container .goog-te-gadget {
           display: block !important;
