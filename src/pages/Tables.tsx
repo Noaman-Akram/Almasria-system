@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { ChevronDown, ChevronRight, RefreshCw, Database, Users } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import { formatDateTime } from '../utils/date';
 
 interface ColumnInfo {
   table_name: string;
@@ -43,6 +44,38 @@ const Tables: React.FC = () => {
   const [authUsers, setAuthUsers] = useState<AuthUser[]>([]);
   const [authUsersExpanded, setAuthUsersExpanded] = useState(false);
   const [authUsersLoading, setAuthUsersLoading] = useState(false);
+
+  // Helper function to format cell values, especially dates with detailed time
+  const formatCellValue = (value: any, columnName: string): string => {
+    if (value === null || value === undefined) {
+      return 'null';
+    }
+
+    // Check if this is a date/timestamp column
+    const isDateColumn = columnName.includes('_at') || 
+                        columnName.includes('date') || 
+                        columnName === 'created_at' || 
+                        columnName === 'updated_at' ||
+                        columnName === 'last_sign_in_at' ||
+                        columnName === 'email_confirmed_at' ||
+                        columnName === 'confirmed_at' ||
+                        columnName === 'phone_confirmed_at';
+
+    if (isDateColumn && value) {
+      try {
+        // Try to parse and format the date with detailed time
+        const date = new Date(value);
+        if (!isNaN(date.getTime())) {
+          return formatDateTime(date);
+        }
+      } catch (error) {
+        // If date parsing fails, return the original value
+        console.warn(`Failed to parse date for column ${columnName}:`, value);
+      }
+    }
+
+    return value.toString();
+  };
 
   const fetchTables = async () => { 
     setLoading(true);
@@ -382,7 +415,7 @@ const Tables: React.FC = () => {
                                   key={column.column_name}
                                   className="px-3 py-2 whitespace-nowrap text-gray-600"
                                 >
-                                  {user[column.column_name as keyof AuthUser]?.toString() || 'null'}
+                                  {formatCellValue(user[column.column_name as keyof AuthUser], column.column_name)}
                                 </td>
                               ))}
                             </tr>
@@ -446,7 +479,7 @@ const Tables: React.FC = () => {
                                       key={column.column_name}
                                       className="px-3 py-2 whitespace-nowrap text-gray-600"
                                     >
-                                      {row[column.column_name]?.toString() || 'null'}
+                                      {formatCellValue(row[column.column_name], column.column_name)}
                                     </td>
                                   ))}
                                 </tr>

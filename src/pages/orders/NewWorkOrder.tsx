@@ -337,7 +337,54 @@ const NewWorkOrder: React.FC = () => {
           setImageUploading(false);
         }
       }
- 
+
+      // 2. Create work order details
+      const totalCost = calculateTotalCost();
+      const { data: detail, error: detailError } = await supabase
+        .from('order_details')
+        .insert({
+          order_id: selectedSaleOrder.id,
+          assigned_to: workOrderData.assigned_to,
+          due_date: workOrderData.due_date || null,
+          price: workOrderData.price,
+          total_cost: totalCost,
+          notes: workOrderData.notes || null,
+          img_url: imageUrl || null,
+          process_stage: 'not_started',
+        })
+        .select()
+        .single();
+
+      if (detailError) throw detailError;
+
+      // 3. Insert cost breakdown items if provided
+      if (costBreakdown && costBreakdown.length > 0) {
+        const costBreakdownItems = costBreakdown
+          .filter(item => item.total_cost && item.total_cost > 0) // Only include items with actual costs
+          .map((item) => ({
+            order_detail_id: detail.detail_id,
+            type: item.type,
+            quantity: item.quantity,
+            unit: item.unit,
+            cost_per_unit: item.cost_per_unit,
+            total_cost: item.total_cost,
+            notes: item.notes,
+            added_by: workOrderData.assigned_to,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }));
+
+        if (costBreakdownItems.length > 0) {
+          const { error: costBreakdownError } = await supabase
+            .from('order_cost_breakdown')
+            .insert(costBreakdownItems);
+
+          if (costBreakdownError) {
+            console.error('[NewWorkOrder] Error creating cost breakdown items:', costBreakdownError);
+            // Don't throw here, we'll still continue with the work order creation
+          }
+        }
+      }
 
       // 4. Update sale order status to 'working' (not 'converted')
       await supabase

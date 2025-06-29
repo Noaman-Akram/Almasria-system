@@ -13,6 +13,7 @@ import Layout from './components/layout/Layout';
 import CustomersList from './pages/customers/CustomersList';
 import SaleOrdersList from './pages/orders/sale/SaleOrdersList';
 import NewSaleOrder from './pages/orders/sale/NewSaleOrder';
+import EditSaleOrder from './pages/orders/sale/EditSaleOrder';
 import WorkOrdersList from './pages/orders/WorkOrdersList';
 import NewWorkOrder from './pages/orders/NewWorkOrder';
 import Tables from './pages/Tables';
@@ -106,6 +107,7 @@ const AppRoutes: React.FC = () => {
         </PrivateRoute>
       } />
       
+      {/* Work Orders List - Admin and Internal only (Sales CANNOT access) */}
       <Route path="/orders/work" element={
         <PrivateRoute allowedRoles={['admin', 'internal']}>
           <Layout>
@@ -114,8 +116,9 @@ const AppRoutes: React.FC = () => {
         </PrivateRoute>
       } />
 
+      {/* Work Order Creation - Admin, Internal, and Sales can create */}
       <Route path="/orders/work/new/:orderId?" element={
-        <PrivateRoute allowedRoles={['admin', 'internal']}>
+        <PrivateRoute allowedRoles={['admin', 'internal', 'sales']}>
           <Layout>
             <NewWorkOrder />
           </Layout>
@@ -151,6 +154,15 @@ const AppRoutes: React.FC = () => {
         <PrivateRoute allowedRoles={['admin', 'sales']}>
           <Layout>
             <NewSaleOrder />
+          </Layout>
+        </PrivateRoute>
+      } />
+
+      {/* Sale Order Edit Route */}
+      <Route path="/orders/sale/edit/:orderId" element={
+        <PrivateRoute allowedRoles={['admin', 'sales']}>
+          <Layout>
+            <EditSaleOrder />
           </Layout>
         </PrivateRoute>
       } />

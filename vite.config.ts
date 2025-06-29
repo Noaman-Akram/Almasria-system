@@ -12,7 +12,8 @@ export default defineConfig({
   },
   preview: {
     port: 5174,
-    host: true
+    host: true,
+    historyApiFallback: true
   },
   build: {
     rollupOptions: {
@@ -24,4 +25,6 @@ export default defineConfig({
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom', 'lucide-react'],
   },
+  // Add base configuration for proper routing
+  base: './',
 });

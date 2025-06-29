@@ -306,10 +306,24 @@ const Dashboard: React.FC = () => {
                   </div>
                 </div>
               </Card>
+
+              {/* Convert to Work Order - Available for sales users */}
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/orders/work/new')}>
+                <div className="p-6 text-center">
+                  <div className="bg-orange-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                    <Hammer size={32} className="text-orange-600" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Create Work Order</h3>
+                  <p className="text-gray-600 mb-4">Convert sale orders to work orders</p>
+                  <div className="bg-orange-50 text-orange-700 px-4 py-2 rounded-lg text-sm font-medium">
+                    Click to Create
+                  </div>
+                </div>
+              </Card>
             </>
           )}
 
-          {/* Work Orders - Available for internal and admin */}
+          {/* Work Orders - Available for internal and admin only (NOT sales) */}
           {(userRole === 'internal' || userRole === 'admin') && (
             <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/orders/work')}>
               <div className="p-6 text-center">
@@ -348,7 +362,7 @@ const Dashboard: React.FC = () => {
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Your Role</h3>
               <p className="text-gray-600 mb-4 capitalize">{userRole || 'User'}</p>
               <div className="bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">
-                {userRole === 'admin' ? 'Full Access' : 'Limited Access'}
+                {userRole === 'admin' ? 'Full Access' : userRole === 'sales' ? 'Sales Access + Work Order Creation' : 'Limited Access'}
               </div>
             </div>
           </Card>
@@ -368,6 +382,10 @@ const Dashboard: React.FC = () => {
                   <div className="flex items-start space-x-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
                     <p>Create <strong>New Sale Orders</strong> for customers with detailed measurements</p>
+                  </div>
+                  <div className="flex items-start space-x-2">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
+                    <p>Convert sale orders to <strong>Work Orders</strong> when ready for production</p>
                   </div>
                 </>
               )}
