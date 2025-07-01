@@ -370,11 +370,12 @@ export async function deleteAssignment(
 }
 
 /**
- * Fetches all orders with status 'working'.
+ * Fetches all orders with status 'working' and their associated stages.
+ * FIXED: Now properly fetches order_stages linked to order_details
  */
 export async function getAllOrders(): Promise<Order[]> {
   try {
-    console.log('Fetching all working orders');
+    console.log('Fetching all working orders with stages');
 
     const { data, error } = await supabase
       .from('orders')
@@ -394,12 +395,22 @@ export async function getAllOrders(): Promise<Order[]> {
           price,
           total_cost,
           order_stages (
-            *
+            id,
+            order_detail_id,
+            stage_name,
+            status,
+            planned_start_date,
+            planned_finish_date,
+            actual_start_date,
+            actual_finish_date,
+            notes,
+            created_at,
+            updated_at
           )
         )
       `
       )
-      .ilike('order_status', 'working')
+      .eq('order_status', 'working')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -408,6 +419,7 @@ export async function getAllOrders(): Promise<Order[]> {
     }
 
     console.log(`Fetched ${data?.length || 0} orders`);
+    console.log('Raw data from Supabase for getAllOrders:', JSON.stringify(data, null, 2));
 
     return (data || []).map((order) => ({
       id: order.id,
@@ -436,7 +448,19 @@ export async function getAllOrders(): Promise<Order[]> {
             price: detail.price,
             total_cost: detail.total_cost,
             stages: Array.isArray(detail.order_stages)
-              ? detail.order_stages
+              ? detail.order_stages.map((stage: any) => ({
+                  id: stage.id,
+                  order_detail_id: stage.order_detail_id,
+                  stage_name: stage.stage_name,
+                  status: stage.status,
+                  planned_start_date: stage.planned_start_date,
+                  planned_finish_date: stage.planned_finish_date,
+                  actual_start_date: stage.actual_start_date,
+                  actual_finish_date: stage.actual_finish_date,
+                  notes: stage.notes,
+                  created_at: stage.created_at,
+                  updated_at: stage.updated_at,
+                }))
               : [],
           }))
         : [],

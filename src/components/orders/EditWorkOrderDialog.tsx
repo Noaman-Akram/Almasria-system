@@ -16,7 +16,6 @@ import {
   Wrench,
   Truck,
   Settings,
-  Package,
   Upload,
   Image,
 } from 'lucide-react';
@@ -44,10 +43,10 @@ interface CostBreakdownItem {
   notes: string | null;
 }
 
+// Valid cost breakdown types that match the database constraint
 const COST_BREAKDOWN_TYPES = [
   { value: 'cutting', label: 'Cutting' },
   { value: 'finishing', label: 'Finishing' },
-  { value: 'material', label: 'Material' },
   { value: 'delivery', label: 'Delivery' },
   { value: 'other', label: 'Other' },
 ];
@@ -99,14 +98,6 @@ const EditWorkOrderDialog = ({
             notes: null,
           },
           {
-            type: 'material',
-            quantity: null,
-            unit: 'piece',
-            cost_per_unit: null,
-            total_cost: null,
-            notes: null,
-          },
-          {
             type: 'delivery',
             quantity: null,
             unit: null,
@@ -127,7 +118,7 @@ const EditWorkOrderDialog = ({
 
   const [workOrderData, setWorkOrderData] = useState({
     assigned_to: workOrder.assigned_to,
-    due_date: workOrder.due_date.split('T')[0], // Format date for input
+    due_date: workOrder.due_date ? workOrder.due_date.split('T')[0] : '', // Fixed: Added null check
     price: workOrder.price,
     notes: workOrder.notes || '',
     img_url: workOrder.img_url || '',
@@ -273,7 +264,7 @@ const EditWorkOrderDialog = ({
       return false;
     }
 
-    if (!workOrderData.assigned_to || !workOrderData.due_date) {
+    if (!workOrderData.assigned_to) {
       setToast({
         type: 'error',
         message: 'Please fill in all required work order fields',
@@ -409,18 +400,26 @@ const EditWorkOrderDialog = ({
       // 4. Update work order details
       console.log('[EditWorkOrderDialog] Updating work order details');
       const totalCost = calculateTotalCost();
+      
+      // Prepare the update data with proper null handling for due_date
+      const updateData: any = {
+        assigned_to: workOrderData.assigned_to,
+        price: workOrderData.price,
+        total_cost: totalCost,
+        notes: workOrderData.notes,
+        img_url: imageUrl,
+        process_stage: workOrder.process_stage,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Only add due_date if it's provided and not empty
+      if (workOrderData.due_date && workOrderData.due_date.trim() !== '') {
+        updateData.due_date = new Date(workOrderData.due_date).toISOString();
+      }
+
       const { error: workOrderError } = await supabase
         .from('order_details')
-        .update({
-          assigned_to: workOrderData.assigned_to,
-          due_date: new Date(workOrderData.due_date).toISOString(),
-          price: workOrderData.price,
-          total_cost: totalCost,
-          notes: workOrderData.notes,
-          img_url: imageUrl, // Save the image URL
-          process_stage: workOrder.process_stage,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('detail_id', Number(workOrder.detail_id));
 
       if (workOrderError) throw workOrderError;
@@ -436,28 +435,32 @@ const EditWorkOrderDialog = ({
         .delete()
         .eq('order_detail_id', Number(workOrder.detail_id));
 
-      // Then insert new items
-      const costBreakdownItems = costBreakdown.map((item) => ({
-        order_detail_id: Number(workOrder.detail_id),
-        type: item.type,
-        quantity: item.quantity,
-        unit: item.unit,
-        cost_per_unit: item.cost_per_unit,
-        total_cost: item.total_cost,
-        notes: item.notes,
-        added_by: workOrder.assigned_to,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }));
+      // Then insert new items (only items with costs)
+      const costBreakdownItems = costBreakdown
+        .filter(item => item.total_cost && item.total_cost > 0) // Only include items with actual costs
+        .map((item) => ({
+          order_detail_id: Number(workOrder.detail_id),
+          type: item.type,
+          quantity: item.quantity,
+          unit: item.unit,
+          cost_per_unit: item.cost_per_unit,
+          total_cost: item.total_cost,
+          notes: item.notes,
+          added_by: workOrder.assigned_to,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }));
 
-      const { error: costBreakdownError } = await supabase
-        .from('order_cost_breakdown')
-        .insert(costBreakdownItems);
+      if (costBreakdownItems.length > 0) {
+        const { error: costBreakdownError } = await supabase
+          .from('order_cost_breakdown')
+          .insert(costBreakdownItems);
 
-      if (costBreakdownError) throw costBreakdownError;
-      console.log(
-        '[EditWorkOrderDialog] Cost breakdown items updated successfully'
-      );
+        if (costBreakdownError) throw costBreakdownError;
+        console.log(
+          '[EditWorkOrderDialog] Cost breakdown items updated successfully'
+        );
+      }
 
       setToast({
         type: 'success',
@@ -479,8 +482,6 @@ const EditWorkOrderDialog = ({
         return <Scissors className="h-4 w-4 text-blue-600" />;
       case 'finishing':
         return <Wrench className="h-4 w-4 text-purple-600" />;
-      case 'material':
-        return <Package className="h-4 w-4 text-green-600" />;
       case 'delivery':
         return <Truck className="h-4 w-4 text-orange-600" />;
       default:
@@ -658,7 +659,7 @@ const EditWorkOrderDialog = ({
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
-                  Due Date *
+                  Due Date
                 </label>
                 <input
                   type="date"
@@ -670,7 +671,6 @@ const EditWorkOrderDialog = ({
                     }))
                   }
                   className="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
-                  required
                 />
               </div>
 

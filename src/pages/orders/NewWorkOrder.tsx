@@ -13,19 +13,19 @@ import {
   Trash2,
   DollarSign,
   Loader2,
-  Package,
   Upload,
   Image,
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { supabase } from '../../lib/supabase';
-import { ENGINEERS } from '../../lib/constants';
+import { ENGINEERS, WORK_ORDER_STAGES, STAGE_STATUSES } from '../../lib/constants';
 import SaleOrderSelector from '../../components/orders/SaleOrderSelector';
 import { useAuth } from '../../contexts/AuthContext';
 import Toast from '../../components/ui/Toast';
 import { ImageCompression } from '../../services/ImageCompression';
 
+// Valid cost breakdown types that match the database constraint
 const COST_BREAKDOWN_TYPES = [
   {
     value: 'cutting',
@@ -38,12 +38,6 @@ const COST_BREAKDOWN_TYPES = [
     label: 'Finishing',
     icon: Wrench,
     color: 'text-purple-600',
-  },
-  {
-    value: 'material',
-    label: 'Material',
-    icon: Package,
-    color: 'text-green-600',
   },
   {
     value: 'delivery',
@@ -83,7 +77,7 @@ const NewWorkOrder: React.FC = () => {
     img_url: '',
   });
 
-  // Initialize with all cost breakdown types by default
+  // Initialize with valid cost breakdown types only
   const [costBreakdown, setCostBreakdown] = useState<CostBreakdownItem[]>([
     {
       type: 'cutting',
@@ -97,14 +91,6 @@ const NewWorkOrder: React.FC = () => {
       type: 'finishing',
       quantity: null,
       unit: 'meter',
-      cost_per_unit: null,
-      total_cost: null,
-      notes: null,
-    },
-    {
-      type: 'material',
-      quantity: null,
-      unit: 'piece',
       cost_per_unit: null,
       total_cost: null,
       notes: null,
@@ -289,6 +275,8 @@ const NewWorkOrder: React.FC = () => {
     try {
       if (!user) throw new Error('User not authenticated');
 
+      console.log('[NewWorkOrder] Starting work order creation process');
+
       // 1. Compress and upload image if selected
       let imageUrl = '';
       if (selectedImage) {
@@ -340,6 +328,8 @@ const NewWorkOrder: React.FC = () => {
 
       // 2. Create work order details
       const totalCost = calculateTotalCost();
+      console.log('[NewWorkOrder] Creating order_details record');
+      
       const { data: detail, error: detailError } = await supabase
         .from('order_details')
         .insert({
@@ -355,26 +345,61 @@ const NewWorkOrder: React.FC = () => {
         .select()
         .single();
 
-      if (detailError) throw detailError;
+      if (detailError) {
+        console.error('[NewWorkOrder] Error creating order_details:', detailError);
+        throw detailError;
+      }
 
-      // 3. Insert cost breakdown items if provided
+      console.log('[NewWorkOrder] Created order_details:', detail);
+
+      // 3. CRITICAL: Create order_stages for the work order
+      console.log('[NewWorkOrder] Creating order_stages for scheduling');
+      
+      const stages = WORK_ORDER_STAGES.map((stage) => ({
+        order_detail_id: detail.detail_id,
+        stage_name: stage.value,
+        status: STAGE_STATUSES[0].value, // 'not_started'
+        planned_start_date: null,
+        planned_finish_date: null,
+        actual_start_date: null,
+        actual_finish_date: null,
+        notes: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { data: createdStages, error: stagesError } = await supabase
+        .from('order_stages')
+        .insert(stages)
+        .select();
+
+      if (stagesError) {
+        console.error('[NewWorkOrder] Error creating order_stages:', stagesError);
+        throw stagesError;
+      }
+
+      console.log('[NewWorkOrder] Created order_stages:', createdStages);
+
+      // 4. Insert cost breakdown items if provided (only items with costs)
       if (costBreakdown && costBreakdown.length > 0) {
         const costBreakdownItems = costBreakdown
           .filter(item => item.total_cost && item.total_cost > 0) // Only include items with actual costs
           .map((item) => ({
             order_detail_id: detail.detail_id,
-            type: item.type,
+            type: item.type, // This should now be one of: cutting, finishing, delivery, other
             quantity: item.quantity,
             unit: item.unit,
             cost_per_unit: item.cost_per_unit,
             total_cost: item.total_cost,
-            notes: item.notes,
+            notes: item.notes, // Include notes in the database insert
             added_by: workOrderData.assigned_to,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }));
 
         if (costBreakdownItems.length > 0) {
+          console.log('[NewWorkOrder] Inserting cost breakdown items:', costBreakdownItems);
+          
           const { error: costBreakdownError } = await supabase
             .from('order_cost_breakdown')
             .insert(costBreakdownItems);
@@ -382,19 +407,33 @@ const NewWorkOrder: React.FC = () => {
           if (costBreakdownError) {
             console.error('[NewWorkOrder] Error creating cost breakdown items:', costBreakdownError);
             // Don't throw here, we'll still continue with the work order creation
+          } else {
+            console.log('[NewWorkOrder] Created cost breakdown items');
           }
         }
       }
 
-      // 4. Update sale order status to 'working' (not 'converted')
-      await supabase
+      // 5. Update sale order status to 'working'
+      console.log('[NewWorkOrder] Updating sale order status to working');
+      
+      const { error: orderUpdateError } = await supabase
         .from('orders')
-        .update({ order_status: 'working' })
+        .update({ 
+          order_status: 'working',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', selectedSaleOrder.id);
+
+      if (orderUpdateError) {
+        console.error('[NewWorkOrder] Error updating order status:', orderUpdateError);
+        throw orderUpdateError;
+      }
+
+      console.log('[NewWorkOrder] Work order creation completed successfully');
 
       setToast({
         type: 'success',
-        message: 'Work order created successfully!',
+        message: 'Work order created successfully with stages for scheduling!',
       });
 
       // Navigate to work orders list after a short delay
@@ -780,6 +819,21 @@ const NewWorkOrder: React.FC = () => {
                     </div>
                   </div>
                 </div>
+                {/* Notes for Cutting */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    value={costBreakdown[0].notes || ''}
+                    onChange={(e) =>
+                      updateCostBreakdownItem(0, 'notes', e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                    rows={2}
+                    placeholder="Add notes for cutting costs..."
+                  />
+                </div>
               </div>
 
               {/* Finishing */}
@@ -855,80 +909,20 @@ const NewWorkOrder: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Material */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="flex items-center space-x-2 mb-3">
-                  <Package className="h-4 w-4 text-green-600" />
-                  <h4 className="font-medium text-gray-900">Material</h4>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Cost per Unit (EGP)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={costBreakdown[2].cost_per_unit || ''}
-                      onChange={(e) =>
-                        updateCostBreakdownItem(
-                          2,
-                          'cost_per_unit',
-                          e.target.value
-                        )
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Quantity
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={costBreakdown[2].quantity || ''}
-                      onChange={(e) =>
-                        updateCostBreakdownItem(2, 'quantity', e.target.value)
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Total Cost (Auto-calculated)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={costBreakdown[2].total_cost || ''}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
-                      placeholder="0.00"
-                      readOnly
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <div className="text-sm text-gray-600">
-                      {costBreakdown[2].cost_per_unit &&
-                      costBreakdown[2].quantity ? (
-                        <span className="text-green-600 font-medium">
-                          {costBreakdown[2].cost_per_unit} ×{' '}
-                          {costBreakdown[2].quantity} ={' '}
-                          {costBreakdown[2].total_cost?.toFixed(2)} EGP
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">
-                          Enter cost and quantity
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                {/* Notes for Finishing */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    value={costBreakdown[1].notes || ''}
+                    onChange={(e) =>
+                      updateCostBreakdownItem(1, 'notes', e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                    rows={2}
+                    placeholder="Add notes for finishing costs..."
+                  />
                 </div>
               </div>
 
@@ -947,9 +941,9 @@ const NewWorkOrder: React.FC = () => {
                       type="number"
                       step="0.01"
                       min="0"
-                      value={costBreakdown[3].total_cost || ''}
+                      value={costBreakdown[2].total_cost || ''}
                       onChange={(e) =>
-                        updateCostBreakdownItem(3, 'total_cost', e.target.value)
+                        updateCostBreakdownItem(2, 'total_cost', e.target.value)
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
                       placeholder="0.00"
@@ -960,6 +954,21 @@ const NewWorkOrder: React.FC = () => {
                       Direct cost input
                     </div>
                   </div>
+                </div>
+                {/* Notes for Delivery */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    value={costBreakdown[2].notes || ''}
+                    onChange={(e) =>
+                      updateCostBreakdownItem(2, 'notes', e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                    rows={2}
+                    placeholder="Add notes for delivery costs..."
+                  />
                 </div>
               </div>
 
@@ -978,9 +987,9 @@ const NewWorkOrder: React.FC = () => {
                       type="number"
                       step="0.01"
                       min="0"
-                      value={costBreakdown[4].total_cost || ''}
+                      value={costBreakdown[3].total_cost || ''}
                       onChange={(e) =>
-                        updateCostBreakdownItem(4, 'total_cost', e.target.value)
+                        updateCostBreakdownItem(3, 'total_cost', e.target.value)
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
                       placeholder="0.00"
@@ -991,6 +1000,21 @@ const NewWorkOrder: React.FC = () => {
                       Miscellaneous costs
                     </div>
                   </div>
+                </div>
+                {/* Notes for Other */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    value={costBreakdown[3].notes || ''}
+                    onChange={(e) =>
+                      updateCostBreakdownItem(3, 'notes', e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                    rows={2}
+                    placeholder="Add notes for other costs..."
+                  />
                 </div>
               </div>
 

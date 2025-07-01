@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   format,
   isBefore,
@@ -48,7 +48,6 @@ interface AssignmentFormProps {
 
 // Form State Interface for Type Safety
 interface FormState {
-  selectedOrderId: number | null;
   selectedStageId: number | null;
   selectedEmployees: string[];
   startDate: Date | null;
@@ -57,6 +56,61 @@ interface FormState {
   note: string;
   errors: Record<string, string>;
 }
+
+// Stage status color mapping
+const getStageStatusColor = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case 'not_started':
+      return {
+        bg: 'bg-gray-100',
+        text: 'text-gray-700',
+        border: 'border-l-gray-400',
+        badge: 'bg-gray-100 text-gray-700'
+      };
+    case 'scheduled':
+      return {
+        bg: 'bg-blue-100',
+        text: 'text-blue-700',
+        border: 'border-l-blue-400',
+        badge: 'bg-blue-100 text-blue-700'
+      };
+    case 'in_progress':
+      return {
+        bg: 'bg-yellow-100',
+        text: 'text-yellow-700',
+        border: 'border-l-yellow-400',
+        badge: 'bg-yellow-100 text-yellow-700'
+      };
+    case 'completed':
+      return {
+        bg: 'bg-green-100',
+        text: 'text-green-700',
+        border: 'border-l-green-400',
+        badge: 'bg-green-100 text-green-700'
+      };
+    case 'delayed':
+      return {
+        bg: 'bg-red-100',
+        text: 'text-red-700',
+        border: 'border-l-red-400',
+        badge: 'bg-red-100 text-red-700'
+      };
+    case 'on_hold':
+      return {
+        bg: 'bg-orange-100',
+        text: 'text-orange-700',
+        border: 'border-l-orange-400',
+        badge: 'bg-orange-100 text-orange-700'
+      };
+    default:
+      return {
+        bg: 'bg-gray-100',
+        text: 'text-gray-700',
+        border: 'border-l-gray-400',
+        badge: 'bg-gray-100 text-gray-700'
+      };
+  }
+};
 
 export function AssignmentForm({
   isOpen,
@@ -67,9 +121,11 @@ export function AssignmentForm({
   additionalAssignments = [], // NEW: Additional assignments for multi-employee editing
   date,
 }: AssignmentFormProps) {
-  // --- Single Source of Truth: Form State Object ---
+  // --- SIMPLE ORDER SELECTION VARIABLE (ONLY CHANGES WHEN USER SELECTS) ---
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+  
+  // --- Form State ---
   const [formState, setFormState] = useState<FormState>({
-    selectedOrderId: null,
     selectedStageId: null,
     selectedEmployees: [],
     startDate: date || new Date(),
@@ -79,33 +135,24 @@ export function AssignmentForm({
     errors: {},
   });
 
-  // --- Additional State for UI ---
-  const [loading, setLoading] = useState(false);
+  // --- Static stages for selected order ---
   const [stagesForOrder, setStagesForOrder] = useState<OrderStage[]>([]);
   const [loadingStages, setLoadingStages] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // --- Fetch Orders ---
+  // --- Fetch Orders (ONCE) ---
   const { orders, loading: ordersLoading, error: ordersError } = useOrders();
 
-  // --- Derived State / Memos ---
+  // --- Derived State ---
   const selectedOrder = useMemo(
-    () => orders.find((order) => order.id === formState.selectedOrderId),
-    [orders, formState.selectedOrderId]
+    () => orders.find((order) => order.id === selectedOrderId),
+    [orders, selectedOrderId]
   );
-
-  const orderDetailIds = useMemo(() => {
-    if (!selectedOrder?.order_details?.length) return [];
-    return selectedOrder.order_details.map((detail) => detail.detail_id);
-  }, [selectedOrder]);
 
   // --- State Update Helper Functions ---
   const updateFormState = useCallback((updates: Partial<FormState>) => {
     setFormState((prev) => ({ ...prev, ...updates }));
   }, []);
-
-  const clearErrors = useCallback(() => {
-    updateFormState({ errors: {} });
-  }, [updateFormState]);
 
   const setError = useCallback(
     (field: string, message: string) => {
@@ -116,18 +163,82 @@ export function AssignmentForm({
     [formState.errors, updateFormState]
   );
 
-  // --- Effects ---
-  // FIXED: Initialize form when assignment changes - Handle multi-employee assignments
+  // --- AUTOMATIC STAGE FETCHING WHEN ORDER IS SELECTED ---
+  const fetchStagesForOrder = useCallback(async (orderId: number) => {
+    if (!orderId) {
+      setStagesForOrder([]);
+      return;
+    }
+
+    setLoadingStages(true);
+    try {
+      console.log('[AssignmentForm] Auto-fetching stages for order:', orderId);
+
+      const { data: freshStages, error } = await supabase
+        .from('order_stages')
+        .select(`
+          id,
+          order_detail_id,
+          stage_name,
+          status,
+          planned_start_date,
+          planned_finish_date,
+          actual_start_date,
+          actual_finish_date,
+          notes,
+          created_at,
+          updated_at,
+          order_details!inner (
+            detail_id,
+            order_id
+          )
+        `)
+        .eq('order_details.order_id', orderId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('[AssignmentForm] Error fetching stages:', error);
+        throw error;
+      }
+
+      const transformedStages: OrderStage[] = (freshStages || []).map((stage) => ({
+        id: stage.id,
+        order_detail_id: stage.order_detail_id,
+        stage_name: stage.stage_name,
+        status: stage.status,
+        planned_start_date: stage.planned_start_date,
+        planned_finish_date: stage.planned_finish_date,
+        actual_start_date: stage.actual_start_date,
+        actual_finish_date: stage.actual_finish_date,
+        notes: stage.notes,
+        created_at: stage.created_at,
+        updated_at: stage.updated_at,
+      }));
+
+      console.log('[AssignmentForm] Stages fetched:', transformedStages);
+      setStagesForOrder(transformedStages);
+    } catch (err) {
+      console.error('[AssignmentForm] Error fetching stages:', err);
+      setStagesForOrder([]);
+      setError('stages', 'Failed to load stages. Please try again.');
+    } finally {
+      setLoadingStages(false);
+    }
+  }, [setError]);
+
+  // --- AUTO-FETCH STAGES WHEN ORDER CHANGES ---
+  useEffect(() => {
+    if (selectedOrderId) {
+      fetchStagesForOrder(selectedOrderId);
+    } else {
+      setStagesForOrder([]);
+    }
+  }, [selectedOrderId, fetchStagesForOrder]);
+
+  // --- INITIALIZE FORM WHEN ASSIGNMENT CHANGES ---
   useEffect(() => {
     if (assignment && orders.length > 0 && stages.length > 0) {
-      console.log(
-        '[AssignmentForm] Pre-populating form with assignment:',
-        assignment
-      );
-      console.log(
-        '[AssignmentForm] Additional assignments:',
-        additionalAssignments
-      );
+      console.log('[AssignmentForm] Initializing form with assignment:', assignment);
 
       // Find the stage for this assignment
       const assignmentStage = stages.find(
@@ -144,26 +255,19 @@ export function AssignmentForm({
 
         if (order) {
           console.log('[AssignmentForm] Found matching order:', order);
-          console.log(
-            '[AssignmentForm] Auto-selecting stage:',
-            assignmentStage
-          );
 
-          // FIXED: Collect ALL employees from primary + additional assignments
+          // Collect ALL employees from primary + additional assignments
           const allAssignments = [assignment, ...additionalAssignments];
           const allEmployees = allAssignments
             .map((a) => a.employee_name)
             .filter(Boolean);
 
-          console.log(
-            '[AssignmentForm] All employees to select:',
-            allEmployees
-          );
+          // SET THE ORDER SELECTION (ONLY PLACE IT GETS SET FOR EDITING)
+          setSelectedOrderId(order.id);
 
           updateFormState({
-            selectedOrderId: order.id,
-            selectedStageId: assignment.order_stage_id, // AUTO-SELECT THE STAGE
-            selectedEmployees: allEmployees, // FIXED: Show ALL employees
+            selectedStageId: assignment.order_stage_id,
+            selectedEmployees: allEmployees,
             startDate: assignment.work_date
               ? new Date(assignment.work_date)
               : new Date(),
@@ -174,13 +278,15 @@ export function AssignmentForm({
             note: assignment.note || '',
             errors: {},
           });
+
+          // Set stages from existing stages prop (NO FETCH NEEDED FOR EDITING)
+          const orderStages = stages.filter(s => 
+            order.order_details?.some(detail => detail.detail_id === s.order_detail_id)
+          );
+          setStagesForOrder(orderStages);
           return;
         }
       }
-      console.error(
-        '[AssignmentForm] Could not find order or stage for assignment:',
-        assignment
-      );
     }
 
     // Handle date initialization for new assignments
@@ -194,8 +300,9 @@ export function AssignmentForm({
 
     // Reset form for new assignments
     if (!assignment) {
+      setSelectedOrderId(null);
+      setStagesForOrder([]);
       updateFormState({
-        selectedOrderId: null,
         selectedStageId: null,
         selectedEmployees: [],
         note: '',
@@ -203,66 +310,13 @@ export function AssignmentForm({
         errors: {},
       });
     }
-  }, [
-    assignment,
-    additionalAssignments,
-    date,
-    stages,
-    orders,
-    updateFormState,
-  ]);
-
-  // Fetch stages when order is selected
-  useEffect(() => {
-    async function fetchStages() {
-      if (!orderDetailIds.length) {
-        setStagesForOrder([]);
-        return;
-      }
-
-      setLoadingStages(true);
-      try {
-        console.log(
-          '[AssignmentForm] Fetching stages for order detail IDs:',
-          orderDetailIds
-        );
-
-        const { data, error } = await supabase
-          .from('order_stages')
-          .select('*')
-          .in('order_detail_id', orderDetailIds)
-          .order('stage_name', { ascending: true });
-
-        if (error) {
-          console.error('[AssignmentForm] Error fetching stages:', error);
-          setStagesForOrder([]);
-        } else {
-          console.log('[AssignmentForm] Fetched stages:', data);
-          setStagesForOrder(data || []);
-        }
-      } catch (err) {
-        console.error('[AssignmentForm] Unexpected error:', err);
-        setStagesForOrder([]);
-      } finally {
-        setLoadingStages(false);
-      }
-    }
-
-    fetchStages();
-  }, [orderDetailIds]);
-
-  // Reset stage selection when order changes (but not during initial load or editing)
-  useEffect(() => {
-    if (formState.selectedOrderId && !assignment) {
-      updateFormState({ selectedStageId: null });
-    }
-  }, [formState.selectedOrderId, assignment, updateFormState]);
+  }, [assignment, additionalAssignments, date, stages, orders, updateFormState]);
 
   // --- Validation ---
   const validateForm = useCallback(() => {
     const newErrors: Record<string, string> = {};
 
-    if (!formState.selectedOrderId) {
+    if (!selectedOrderId) {
       newErrors.order = 'Please select an order';
     }
     if (!formState.selectedStageId) {
@@ -288,17 +342,21 @@ export function AssignmentForm({
 
     updateFormState({ errors: newErrors });
     return Object.keys(newErrors).length === 0;
-  }, [formState, updateFormState]);
+  }, [selectedOrderId, formState, updateFormState]);
 
   // --- Event Handlers ---
+  // SIMPLE ORDER CHANGE - SETS selectedOrderId AND AUTO-FETCHES STAGES
   const handleOrderChange = useCallback(
     (value: string) => {
       const orderId = Number(value);
-      console.log('[AssignmentForm] Order selected:', orderId);
-
+      console.log('[AssignmentForm] User selected order:', orderId);
+      
+      // SET THE ORDER ID - THIS WILL TRIGGER AUTO-FETCH VIA useEffect
+      setSelectedOrderId(orderId);
+      
+      // Reset stage selection
       updateFormState({
-        selectedOrderId: orderId,
-        selectedStageId: null, // Reset stage when order changes
+        selectedStageId: null,
         errors: { ...formState.errors, order: '' },
       });
     },
@@ -308,8 +366,6 @@ export function AssignmentForm({
   const handleStageChange = useCallback(
     (value: string) => {
       const stageId = Number(value);
-      console.log('[AssignmentForm] Stage selected:', stageId);
-
       updateFormState({
         selectedStageId: stageId,
         errors: { ...formState.errors, stage: '' },
@@ -375,14 +431,9 @@ export function AssignmentForm({
   // --- Form Submission ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!validateForm()) {
-      console.log('[AssignmentForm] Form validation failed.');
-      return;
-    }
+    if (!validateForm()) return;
 
     setLoading(true);
-    clearErrors();
 
     try {
       const selectedStage = stagesForOrder.find(
@@ -390,14 +441,7 @@ export function AssignmentForm({
       );
 
       if (!selectedStage || !selectedStage.order_detail_id) {
-        setError(
-          'form',
-          'Selected stage is invalid or missing order detail link. Please select again.'
-        );
-        console.error('[AssignmentForm] Validation failed: ', {
-          selectedStage,
-          selectedStageId: formState.selectedStageId,
-        });
+        setError('form', 'Selected stage is invalid. Please select a different order or stage.');
         return;
       }
 
@@ -406,34 +450,19 @@ export function AssignmentForm({
       );
 
       if (!orderDetail) {
-        setError(
-          'form',
-          'Selected stage does not belong to the selected order. Please check selection.'
-        );
-        console.error(
-          '[AssignmentForm] Validation failed: Selected stage does not belong to selected order'
-        );
+        setError('form', 'Selected stage does not belong to the selected order.');
         return;
       }
 
-      if (!formState.startDate) {
-        setError('form', 'Start date is required.');
+      if (!formState.startDate || formState.selectedEmployees.length === 0) {
+        setError('form', 'Start date and at least one employee are required.');
         return;
       }
 
-      if (formState.selectedEmployees.length === 0) {
-        setError('form', 'At least one employee must be selected.');
-        return;
-      }
-
-      // Handle UPDATE vs CREATE properly
+      // Handle UPDATE vs CREATE
       if (assignment) {
-        console.log(
-          '[AssignmentForm] UPDATING existing assignment:',
-          assignment.id
-        );
+        console.log('[AssignmentForm] UPDATING existing assignment:', assignment.id);
 
-        // For updates, create assignments for all selected employees
         const assignmentsToSubmit: Omit<OrderStageAssignment, 'id'>[] = [];
 
         for (const employee of formState.selectedEmployees) {
@@ -452,7 +481,6 @@ export function AssignmentForm({
       } else {
         console.log('[AssignmentForm] CREATING new assignment(s)');
 
-        // For new assignments, create based on date range and employees
         const assignmentsToSubmit: Omit<OrderStageAssignment, 'id'>[] = [];
 
         if (formState.isMultiDay && formState.startDate && formState.endDate) {
@@ -488,15 +516,8 @@ export function AssignmentForm({
           }
         }
 
-        console.log(
-          '[AssignmentForm] New assignments to be submitted:',
-          assignmentsToSubmit
-        );
-
         if (assignmentsToSubmit.length === 0) {
-          const msg =
-            'No assignments were generated based on your selections. Please check dates and employees.';
-          setError('form', msg);
+          setError('form', 'No assignments were generated. Please check your selections.');
           return;
         }
 
@@ -505,15 +526,10 @@ export function AssignmentForm({
 
       onClose();
     } catch (error) {
-      console.error(
-        '[AssignmentForm] Error during assignment submission:',
-        error
-      );
+      console.error('[AssignmentForm] Error during submission:', error);
       setError(
         'form',
-        error instanceof Error
-          ? error.message
-          : 'An unexpected error occurred during submission.'
+        error instanceof Error ? error.message : 'An unexpected error occurred.'
       );
     } finally {
       setLoading(false);
@@ -529,7 +545,7 @@ export function AssignmentForm({
   };
 
   const getStagePlaceholder = () => {
-    if (!formState.selectedOrderId) return 'Select an order first';
+    if (!selectedOrderId) return 'Select an order first';
     if (loadingStages) return 'Loading stages...';
     if (stagesForOrder.length === 0) return 'No stages for this order';
     return 'Select a stage';
@@ -566,7 +582,7 @@ export function AssignmentForm({
                 <div>
                   <Label htmlFor="order">Order *</Label>
                   <Select
-                    value={formState.selectedOrderId?.toString() || ''}
+                    value={selectedOrderId?.toString() || ''}
                     onValueChange={handleOrderChange}
                     disabled={ordersLoading}
                   >
@@ -574,32 +590,24 @@ export function AssignmentForm({
                       <SelectValue placeholder={getOrderPlaceholder()} />
                     </SelectTrigger>
                     <SelectContent>
-                      {orders.map((order) => {
-                        const dueDate = order.order_details?.[0]?.due_date
-                          ? new Date(
-                              order.order_details[0].due_date
-                            ).toLocaleDateString()
-                          : 'No due date';
-
-                        return (
-                          <SelectItem
-                            key={order.id}
-                            value={order.id.toString()}
-                          >
-                            <div className="flex flex-col py-1">
-                              <div className="font-medium">
+                      {orders.map((order) => (
+                        <SelectItem
+                          key={order.id}
+                          value={order.id.toString()}
+                        >
+                          <div className="flex items-center space-x-3 py-1">
+                            <User className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                            <div className="flex flex-col">
+                              <div className="font-medium text-gray-900">
                                 #{order.id} - {order.code}
                               </div>
-                              <div className="text-xs text-gray-600">
+                              <div className="text-sm font-medium text-blue-600">
                                 {order.customer_name}
                               </div>
-                              <div className="text-xs text-gray-500">
-                                Status: {order.order_status} | Due: {dueDate}
-                              </div>
                             </div>
-                          </SelectItem>
-                        );
-                      })}
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   {formState.errors.order && (
@@ -612,7 +620,7 @@ export function AssignmentForm({
                 <div>
                   <Label htmlFor="stage">
                     Stage{' '}
-                    {formState.selectedOrderId && selectedOrder
+                    {selectedOrderId && selectedOrder
                       ? `for Order ${selectedOrder.code}`
                       : ''}{' '}
                     *
@@ -620,31 +628,44 @@ export function AssignmentForm({
                   <Select
                     value={formState.selectedStageId?.toString() || ''}
                     onValueChange={handleStageChange}
-                    disabled={
-                      !formState.selectedOrderId || stagesForOrder.length === 0
-                    }
+                    disabled={!selectedOrderId || loadingStages}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder={getStagePlaceholder()} />
                     </SelectTrigger>
                     <SelectContent>
-                      {stagesForOrder.map((stage) => (
-                        <SelectItem key={stage.id} value={stage.id.toString()}>
-                          <div className="flex flex-col py-1">
-                            <div className="font-medium">
-                              {stage.stage_name}
+                      {stagesForOrder.map((stage) => {
+                        const colors = getStageStatusColor(stage.status);
+                        return (
+                          <SelectItem key={stage.id} value={stage.id.toString()}>
+                            <div className={`flex items-center space-x-3 py-1 pl-3 border-l-4 ${colors.border}`}>
+                              <div className="flex flex-col flex-1">
+                                <div className="font-medium text-gray-900">
+                                  {stage.stage_name}
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${colors.badge}`}>
+                                    {stage.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    Updated: {stage.updated_at ? new Date(stage.updated_at).toLocaleDateString() : 'Never'}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                            <div className="text-xs text-gray-500">
-                              Status: {stage.status}
-                            </div>
-                          </div>
-                        </SelectItem>
-                      ))}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                   {formState.errors.stage && (
                     <p className="text-sm text-red-500 mt-1">
                       {formState.errors.stage}
+                    </p>
+                  )}
+                  {loadingStages && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      Loading stages automatically...
                     </p>
                   )}
                 </div>
@@ -665,13 +686,9 @@ export function AssignmentForm({
                       <span className="font-medium">Code:</span>{' '}
                       {selectedOrder.code}
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <span className="font-medium">Customer:</span>{' '}
                       {selectedOrder.customer_name}
-                    </div>
-                    <div>
-                      <span className="font-medium">Status:</span>{' '}
-                      {selectedOrder.order_status}
                     </div>
                     <div className="col-span-2">
                       <span className="font-medium">Due Date:</span>{' '}
@@ -680,6 +697,10 @@ export function AssignmentForm({
                             selectedOrder.order_details[0].due_date
                           ).toLocaleDateString()
                         : 'No due date set'}
+                    </div>
+                    <div className="col-span-2">
+                      <span className="font-medium">Available Stages:</span>{' '}
+                      {stagesForOrder.length} stages found
                     </div>
                   </div>
                 </div>
