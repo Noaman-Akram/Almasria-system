@@ -1,28 +1,29 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Building2, 
   Calculator, 
   Home,
   Phone,
   Plus,
-    Trash2,
+  Trash2,
   User,
   UserPlus,
   MapPin,
   Ruler,
   Box,
   Loader2,
-  Copy
+  ArrowLeft,
+  Save
 } from 'lucide-react';
-import Button from '../../components/ui/Button';
-import Card from '../../components/ui/Card';
-import RadioGroup from '../../components/ui/RadioGroup';
-import Toast from '../../components/ui/Toast';
-import { EGYPTIAN_CITIES, WORK_TYPES, MATERIAL_TYPES, UNITS } from '../../lib/constants';
-import { useAuth } from '../../contexts/AuthContext';
-import { OrderService } from '../../services/OrderService';
-import { CreateOrderDTO } from '../../types/order';
-import { CustomerService } from '../../services/CustomerService';
+import Button from '../../../components/ui/Button';
+import Card from '../../../components/ui/Card';
+import RadioGroup from '../../../components/ui/RadioGroup';
+import Toast from '../../../components/ui/Toast';
+import { EGYPTIAN_CITIES, WORK_TYPES, MATERIAL_TYPES, UNITS } from '../../../lib/constants';
+import { useAuth } from '../../../contexts/AuthContext';
+import { supabase } from '../../../lib/supabase';
+import { CustomerService } from '../../../services/CustomerService';
 
 interface CustomerInput {
   name: string;
@@ -33,25 +34,23 @@ interface CustomerInput {
 }
 
 interface MeasurementInput {
+  id?: number;
   material_name: string;
   material_type: string;
   unit: string;
   quantity: number;
-  cost: number;
+  price: number;
+  total_price: number;
 }
 
 interface OrderInput {
   customer_id?: number;
   work_types: string[];
   order_price: number;
-  order_status: 'lead' | 'working';
+  order_status: 'sale';
   sales_person?: string;
   sales_person_custom?: string;
   discount?: number;
-}
-
-interface NewOrderProps {
-  onWorkTypesChange?: (types: string[]) => void;
 }
 
 const SALES_PERSONS = [
@@ -63,9 +62,20 @@ const SALES_PERSONS = [
   { value: 'other', label: 'Other (Custom)' }
 ];
 
-const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
+const EditSaleOrder: React.FC = () => {
+  const { orderId } = useParams<{ orderId: string }>();
+  const navigate = useNavigate();
+  useAuth();
+  
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info', message: string } | null>(null);
+  
+  const [originalOrder, setOriginalOrder] = useState<any>(null);
   const [isNewCustomer, setIsNewCustomer] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
+  const [realCustomers, setRealCustomers] = useState<any[]>([]);
+  
   const [customer, setCustomer] = useState<CustomerInput>({
     name: '',
     company: '',
@@ -73,61 +83,147 @@ const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
     city: 'Cairo',
     address_details: ''
   });
+  
   const [order, setOrder] = useState<OrderInput>({
     customer_id: undefined,
     work_types: [],
     order_price: 0,
-    order_status: 'lead',
+    order_status: 'sale',
     sales_person: '',
     sales_person_custom: '',
+    discount: 0,
   });
+  
   const [measurements, setMeasurements] = useState<MeasurementInput[]>([{
     material_name: '',
     material_type: 'marble',
     unit: '',
     quantity: 0,
-    cost: 0
+    price: 0,
+    total_price: 0
   }]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info', message: string } | null>(null);
-  const { user } = useAuth();
-  const orderService = new OrderService();
-  const [realCustomers, setRealCustomers] = useState<any[]>([]);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [lastOrderSummary, setLastOrderSummary] = useState<any | null>(null);
-  const orderPrice = measurements.reduce((sum, m) => sum + (m.quantity * m.cost), 0);
-  const discountedTotal = Math.max(0, orderPrice - (order.discount || 0));
-  
+
+  // Fetch customers for the dropdown
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
         const service = new CustomerService();
         const data = await service.getAll();
         setRealCustomers(data);
-      } catch (err) {}
+      } catch (err) {
+        console.error('Error fetching customers:', err);
+      }
     };
 
     fetchCustomers();
-
   }, []);
 
+  // Load existing order data
   useEffect(() => {
-    // Load draft from localStorage
-    const draft = localStorage.getItem('saleOrderDraft');
-    if (draft) {
-      try {
-        const parsed = JSON.parse(draft);
-        if (parsed.customer) setCustomer(parsed.customer);
-        if (parsed.order) setOrder(parsed.order);
-        if (parsed.measurements) setMeasurements(parsed.measurements);
-      } catch {}
+    if (!orderId) {
+      navigate('/orders/sale');
+      return;
     }
-  }, []);
 
-  useEffect(() => {
-    // Save draft to localStorage on change
-    localStorage.setItem('saleOrderDraft', JSON.stringify({ customer, order, measurements }));
-  }, [customer, order, measurements]);
+    const loadOrderData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch order with customer and measurements
+        const { data: orderData, error: orderError } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            customers (*),
+            measurements (*)
+          `)
+          .eq('id', orderId)
+          .single();
+
+        if (orderError) throw orderError;
+        if (!orderData) throw new Error('Order not found');
+
+        setOriginalOrder(orderData);
+
+        // Check if this order has an existing customer or is a new customer
+        if (orderData.customer_id && orderData.customers) {
+          // Existing customer
+          setIsNewCustomer(false);
+          setSelectedCustomer(orderData.customers);
+          setOrder(prev => ({ ...prev, customer_id: orderData.customer_id }));
+          
+          // Set customer data from the linked customer record
+          setCustomer({
+            name: orderData.customers.name || '',
+            company: orderData.customers.company || '',
+            phone_number: orderData.customers.phone_number || '',
+            city: orderData.customers.address?.split(' - ')[0] || 'Cairo',
+            address_details: orderData.customers.address?.split(' - ').slice(1).join(' - ') || ''
+          });
+        } else {
+          // New customer (data stored in order record)
+          setIsNewCustomer(true);
+          setSelectedCustomer(null);
+          
+          // Parse address to extract city and details
+          const addressParts = orderData.address?.split(' - ') || ['Cairo', ''];
+          const city = addressParts[0] || 'Cairo';
+          const addressDetails = addressParts.slice(1).join(' - ') || '';
+
+          setCustomer({
+            name: orderData.customer_name || '',
+            company: orderData.company || '',
+            phone_number: '', // This might not be stored in order record
+            city: city,
+            address_details: addressDetails
+          });
+        }
+
+        // Set order data
+        setOrder({
+          customer_id: orderData.customer_id,
+          work_types: Array.isArray(orderData.work_types) ? orderData.work_types : [],
+          order_price: orderData.order_price || 0,
+          order_status: 'sale',
+          sales_person: orderData.sales_person || '',
+          sales_person_custom: '',
+          discount: orderData.discount || 0,
+        });
+
+        // Set measurements data
+        const measurementsData = orderData.measurements?.map((m: any) => ({
+          id: m.id,
+          material_name: m.material_name || '',
+          material_type: m.material_type || 'marble',
+          unit: m.unit || '',
+          quantity: m.quantity || 0,
+          price: m.price || 0,
+          total_price: m.total_price || 0
+        })) || [];
+
+        setMeasurements(measurementsData.length > 0 ? measurementsData : [{
+          material_name: '',
+          material_type: 'marble',
+          unit: '',
+          quantity: 0,
+          price: 0,
+          total_price: 0
+        }]);
+
+      } catch (error) {
+        console.error('Error loading order:', error);
+        setToast({ 
+          type: 'error', 
+          message: error instanceof Error ? error.message : 'Failed to load order data' 
+        });
+        navigate('/orders/sale');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadOrderData();
+  }, [orderId, navigate]);
 
   const validatePhoneNumber = (phone: string) => {
     return /^01[0125][0-9]{8}$/.test(phone);
@@ -138,13 +234,7 @@ const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
     if (newIsNewCustomer) {
       setSelectedCustomer(null);
       setOrder(prev => ({ ...prev, customer_id: undefined }));
-      setCustomer({
-        name: '',
-        company: '',
-        phone_number: '',
-        city: 'Cairo',
-        address_details: ''
-      });
+      // Keep current customer data when switching to new customer
     }
   };
 
@@ -154,127 +244,7 @@ const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
       : [...order.work_types, type];
     
     setOrder(prev => ({ ...prev, work_types: newTypes }));
-    if (onWorkTypesChange) {
-      onWorkTypesChange(newTypes);
-    }
   };
-
-  const totals = useMemo(() => {
-    const totalCost = measurements.reduce((sum, m) => sum + (m.quantity * m.cost), 0);
-    const profit = order.order_price - totalCost;
-    const profitMargin = totalCost > 0 ? (profit / totalCost * 100) : 0;
-    
-    return {
-      totalCost,
-      profit,
-      profitMargin: Math.round(profitMargin)
-    };
-  }, [measurements, order.order_price]);
-
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (measurements.length === 0) {
-      setToast({ type: 'error', message: 'At least one measurement is required' });
-      return;
-    }
-
-    // Validate measurements
-    for (const m of measurements) {
-      if (m.quantity <= 0) {
-        setToast({ type: 'error', message: 'Quantity must be greater than 0' });
-        return;
-      }
-      if (m.cost < 0) {
-        setToast({ type: 'error', message: 'Cost cannot be negative' });
-        return;
-      }
-    }
-
-    const hasUnitSelected = measurements.some(m => m.unit !== '');
-    if (!hasUnitSelected) {
-      setToast({ type: 'error', message: 'Please select at least one unit for the measurements' });
-      return;
-    }
-
-    if (!isNewCustomer && !order.customer_id) {
-      setToast({ type: 'error', message: 'Please select a customer' });
-      return;
-    }
-
-    if (isNewCustomer) {
-      if (!customer.name || !customer.phone_number) {
-        setToast({ type: 'error', message: 'Customer name and phone number are required' });
-        return;
-      }
-
-      if (!validatePhoneNumber(customer.phone_number)) {
-        setToast({ type: 'error', message: 'Please enter a valid Egyptian phone number (e.g., 01012345678)' });
-        return;
-      }
-    }
-
-    if (order.work_types.length === 0) {
-      setToast({ type: 'error', message: 'Please select at least one work type' });
-      return;
-    }
- 
-
-    if (!order.sales_person || (order.sales_person === 'other' && !order.sales_person_custom)) {
-      setToast({ type: 'error', message: 'Please select or enter a sales person' });
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const dto: CreateOrderDTO = {
-        customer: isNewCustomer
-          ? {
-              name: customer.name,
-              company: customer.company,
-              phone_number: customer.phone_number,
-              address: `${customer.city} - ${customer.address_details}`
-            }
-          : selectedCustomer, // Use the full selected customer object
-        order: {
-          customer_id: order.customer_id || 0,
-          customer_name: isNewCustomer ? customer.name : (selectedCustomer?.name || ''),
-          address: isNewCustomer ? `${customer.city} - ${customer.address_details}` : (selectedCustomer?.address || ''),
-          order_status: 'sale',
-          order_price: discountedTotal,
-          discount: order.discount,
-          work_types: order.work_types,
-          company: isNewCustomer ? customer.company : (selectedCustomer?.company || ''),
-          sales_person: order.sales_person === 'other' ? order.sales_person_custom : order.sales_person,
-        },
-        measurements: measurements.map((m) => ({
-          material_name: m.material_name,
-          material_type: m.material_type,
-          unit: m.unit,
-          quantity: m.quantity,
-          price: m.cost,
-          total_price: m.quantity * m.cost,
-        }))
-      };
-      if (!user) throw new Error('Not authenticated');
-      const createdOrder = await orderService.createOrder(dto, user.id);
-      setLastOrderSummary(createdOrder);
-      setShowSuccessModal(true);
-      setToast({ type: 'success', message: 'Order created successfully!' });
-      setOrder({ customer_id: undefined, work_types: [], order_price: 0, order_status: 'lead', sales_person: '', sales_person_custom: '' });
-      setCustomer({ name: '', company: '', phone_number: '', city: 'Cairo', address_details: '' });
-      setMeasurements([{ material_name: '', material_type: 'marble', unit: '', quantity: 0, cost: 0 }]);
-      setSelectedCustomer(null);
-      setIsNewCustomer(false);
-      localStorage.removeItem('saleOrderDraft');
-
-    } catch (error) {
-      setToast({ type: 'error', message: error instanceof Error ? error.message : String(error) });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [customer, isNewCustomer, measurements, order, realCustomers, selectedCustomer, user, orderService]);
 
   const addMeasurement = useCallback(() => {
     setMeasurements(prev => [...prev, {
@@ -282,7 +252,8 @@ const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
       material_type: 'marble',
       unit: '',
       quantity: 0,
-      cost: 0
+      price: 0,
+      total_price: 0
     }]);
   }, []);
 
@@ -301,45 +272,200 @@ const NewOrder: React.FC<NewOrderProps> = ({ onWorkTypesChange }) => {
         ...updated[index],
         [field]: value
       };
+      
+      // Auto-calculate total_price when quantity or price changes
+      if (field === 'quantity' || field === 'price') {
+        updated[index].total_price = updated[index].quantity * updated[index].price;
+      }
+      
       return updated;
     });
   }, []);
 
-  const handleCopyToClipboard = () => {
-    if (!lastOrderSummary) return;
-    
-    const orderText = `Order Created Successfully!
+  // Calculate totals - exactly like in creation form
+  const orderPrice = measurements.reduce((sum, m) => sum + (m.quantity * m.price), 0);
+  const discountedTotal = Math.max(0, orderPrice - (order.discount || 0));
 
-Order Details:
-- Order ID: ${lastOrderSummary.id}
-- Order Code: ${lastOrderSummary.code}
-- Customer: ${lastOrderSummary.customer_name}
-- Company: ${lastOrderSummary.company || 'N/A'}
-- Address: ${lastOrderSummary.address}
-- Status: ${lastOrderSummary.order_status}
-- Sales Person: ${lastOrderSummary.sales_person || 'N/A'}
+  const validateForm = () => {
+    if (!isNewCustomer && !order.customer_id) {
+      setToast({ type: 'error', message: 'Please select a customer' });
+      return false;
+    }
 
-Work Types: ${(lastOrderSummary.work_types || []).join(', ')}
+    if (isNewCustomer) {
+      if (!customer.name || !customer.phone_number || !customer.address_details) {
+        setToast({ type: 'error', message: 'Customer name, phone number, and address are required' });
+        return false;
+      }
 
-Order Items:
-${(lastOrderSummary.items || []).map((item: any, idx: number) => 
-  `${idx + 1}. ${item.material_name} (${item.material_type})
-   - Quantity: ${item.quantity} ${item.unit}
-   - Unit Cost: ${item.cost} EGP
-   - Total: ${item.total_cost} EGP`
-).join('\n')}
+      if (!validatePhoneNumber(customer.phone_number)) {
+        setToast({ type: 'error', message: 'Please enter a valid Egyptian phone number (e.g., 01012345678)' });
+        return false;
+      }
+    }
 
-Order Price: ${lastOrderSummary.order_price} EGP`;
+    if (order.work_types.length === 0) {
+      setToast({ type: 'error', message: 'Please select at least one work type' });
+      return false;
+    }
 
-    navigator.clipboard.writeText(orderText).then(() => {
-      setToast({ type: 'success', message: 'Order details copied to clipboard!' });
-    }).catch(() => {
-      setToast({ type: 'error', message: 'Failed to copy to clipboard' });
-    });
+    if (measurements.length === 0) {
+      setToast({ type: 'error', message: 'At least one measurement is required' });
+      return false;
+    }
+
+    for (const m of measurements) {
+      if (!m.material_name || !m.unit || m.quantity <= 0 || m.price < 0) {
+        setToast({ type: 'error', message: 'Please fill in all measurement fields with valid values' });
+        return false;
+      }
+    }
+
+    if (!order.sales_person || (order.sales_person === 'other' && !order.sales_person_custom)) {
+      setToast({ type: 'error', message: 'Please select or enter a sales person' });
+      return false;
+    }
+
+    return true;
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) return;
+    if (!orderId) return;
+
+    setIsSubmitting(true);
+
+    try {
+      let customerId = order.customer_id;
+
+      // Handle customer update/creation
+      if (isNewCustomer) {
+        // For new customer, create or update customer record
+        if (originalOrder.customer_id) {
+          // Update existing customer
+          const { error: customerError } = await supabase
+            .from('customers')
+            .update({
+              name: customer.name,
+              company: customer.company,
+              phone_number: customer.phone_number,
+              address: `${customer.city} - ${customer.address_details}`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', originalOrder.customer_id);
+
+          if (customerError) throw customerError;
+          customerId = originalOrder.customer_id;
+        } else {
+          // Create new customer
+          const { data: newCustomer, error: customerError } = await supabase
+            .from('customers')
+            .insert({
+              name: customer.name,
+              company: customer.company,
+              phone_number: customer.phone_number,
+              address: `${customer.city} - ${customer.address_details}`,
+            })
+            .select()
+            .single();
+
+          if (customerError) throw customerError;
+          customerId = newCustomer.id;
+        }
+      } else {
+        // For existing customer, just update the company field if needed
+        if (selectedCustomer && customer.company !== selectedCustomer.company) {
+          const { error: customerError } = await supabase
+            .from('customers')
+            .update({
+              company: customer.company,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', selectedCustomer.id);
+
+          if (customerError) throw customerError;
+        }
+        customerId = order.customer_id;
+      }
+
+      // Update order data
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({
+          customer_id: customerId,
+          customer_name: isNewCustomer ? customer.name : (selectedCustomer?.name || customer.name),
+          company: customer.company,
+          address: isNewCustomer ? `${customer.city} - ${customer.address_details}` : (selectedCustomer?.address || `${customer.city} - ${customer.address_details}`),
+          work_types: order.work_types,
+          order_price: discountedTotal,
+          discount: order.discount,
+          sales_person: order.sales_person === 'other' ? order.sales_person_custom : order.sales_person,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', orderId);
+
+      if (orderError) throw orderError;
+
+      // Update measurements
+      // First, delete existing measurements
+      const { error: deleteError } = await supabase
+        .from('measurements')
+        .delete()
+        .eq('order_id', orderId);
+
+      if (deleteError) throw deleteError;
+
+      // Then insert updated measurements
+      const measurementsToInsert = measurements.map(m => ({
+        order_id: parseInt(orderId),
+        material_name: m.material_name,
+        material_type: m.material_type,
+        unit: m.unit,
+        quantity: m.quantity,
+        price: m.price,
+        total_price: m.quantity * m.price, // Ensure correct calculation
+      }));
+
+      const { error: measurementsError } = await supabase
+        .from('measurements')
+        .insert(measurementsToInsert);
+
+      if (measurementsError) throw measurementsError;
+
+      setToast({ type: 'success', message: 'Order updated successfully!' });
+      
+      // Navigate back to orders list after a short delay
+      setTimeout(() => {
+        navigate('/orders/sale');
+      }, 1500);
+
+    } catch (error) {
+      console.error('Error updating order:', error);
+      setToast({ 
+        type: 'error', 
+        message: error instanceof Error ? error.message : 'Failed to update order' 
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-gray-700">Loading Order...</h2>
+          <p className="text-gray-500 mt-2">Fetching order details</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <>
+    <div className="space-y-6 max-w-5xl mx-auto pb-12">
       {toast && (
         <Toast
           type={toast.type}
@@ -348,7 +474,33 @@ Order Price: ${lastOrderSummary.order_price} EGP`;
         />
       )}
 
+      <div className="flex items-center justify-between">
+        <Button
+          variant="outline"
+          onClick={() => navigate('/orders/sale')}
+          className="flex items-center space-x-2"
+        >
+          <ArrowLeft size={16} />
+          <span>Back to Orders</span>
+        </Button>
+
+        <div className="flex items-center space-x-4">
+          <div className="bg-blue-50 px-4 py-2 rounded-md">
+            <span className="text-sm text-gray-500">Order Code:</span>
+            <span className="ml-2 font-mono font-bold text-blue-600">
+              {originalOrder?.code || 'Loading...'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center space-x-2">
+        <Box className="h-6 w-6 text-blue-600" />
+        <h1 className="text-2xl font-semibold text-gray-900">Edit Sale Order</h1>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Customer Information */}
         <Card>
           <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -383,7 +535,6 @@ Order Price: ${lastOrderSummary.order_price} EGP`;
                         setOrder({ ...order, customer_id: Number(e.target.value) });
                         setSelectedCustomer(selected || null);
                         setCustomer((prev) => ({ ...prev, company: selected?.company || '' }));
-                        console.log('[NewOrder] Selected customer:', selected);
                       }}
                       className="block w-full pl-10 pr-3 py-3 text-lg rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
                       required
@@ -515,22 +666,23 @@ Order Price: ${lastOrderSummary.order_price} EGP`;
           </div>
         </Card>
 
+        {/* Work Types */}
         <Card>
           <div className="space-y-6">
             <div className="flex items-center space-x-2">
               <Box className="h-5 w-5 text-blue-600" />
               <h3 className="text-lg font-medium text-gray-900">Work Types *</h3>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {WORK_TYPES.map((type) => (
                 <button
                   key={type.value}
                   type="button"
                   onClick={() => handleWorkTypeChange(type.value)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`p-3 rounded-lg text-center transition-colors ${
                     order.work_types.includes(type.value)
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? 'bg-blue-100 text-blue-800 border-2 border-blue-500'
+                      : 'bg-gray-50 text-gray-700 border-2 border-gray-200 hover:bg-gray-100'
                   }`}
                 >
                   {type.label}
@@ -540,6 +692,7 @@ Order Price: ${lastOrderSummary.order_price} EGP`;
           </div>
         </Card>
 
+        {/* Measurements */}
         <Card>
           <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -621,8 +774,8 @@ Order Price: ${lastOrderSummary.order_price} EGP`;
                       <input
                         type="number"
                         step="0.01"
-                        value={measurement.cost}
-                        onChange={(e) => updateMeasurement(index, 'cost', parseFloat(e.target.value) || 0)}
+                        value={measurement.price}
+                        onChange={(e) => updateMeasurement(index, 'price', parseFloat(e.target.value) || 0)}
                         className="mt-1 block w-full px-6 py-3 text-lg rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
                         required
                         min="0"
@@ -635,6 +788,7 @@ Order Price: ${lastOrderSummary.order_price} EGP`;
           </div>
         </Card>
 
+        {/* Order Summary */}
         <Card>
           <div className="space-y-6">
             <div className="flex items-center space-x-2">
@@ -667,6 +821,7 @@ Order Price: ${lastOrderSummary.order_price} EGP`;
                   />
                 )}
               </div>
+              
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700">Discount (EGP)</label>
                 <input
@@ -677,14 +832,12 @@ Order Price: ${lastOrderSummary.order_price} EGP`;
                   className="mt-1 block w-full py-3 text-lg rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
             </div>
-
 
             <div className="bg-gray-50 rounded-lg p-6 space-y-4">
               <div className="flex items-center justify-between text-lg">
                 <span className="font-medium text-gray-700">Total Price:</span>
-                <span className="text-black-600">{totals.totalCost.toLocaleString()} EGP</span>
+                <span className="text-black-600">{orderPrice.toLocaleString()} EGP</span>
               </div>
               <div className="flex items-center justify-between text-lg">
                 <span className="font-medium text-gray-700">Discount:</span>
@@ -692,71 +845,43 @@ Order Price: ${lastOrderSummary.order_price} EGP`;
               </div>
               <div className="flex items-center justify-between text-lg">
                 <span className="font-medium text-gray-700">Final Price:</span>
-                <span className="font-bold text-blue-600">{(discountedTotal).toLocaleString()} EGP</span>
+                <span className="font-bold text-blue-600">{discountedTotal.toLocaleString()} EGP</span>
               </div>
             </div>
           </div>
         </Card>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end space-x-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate('/orders/sale')}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
           <Button
             type="submit"
             size="lg"
-            className="w-full flex items-center justify-center space-x-2 text-lg py-4"
+            className="w-full md:w-auto flex items-center justify-center space-x-2 text-lg py-4"
             disabled={isSubmitting}
           >
             {isSubmitting ? (
               <>
                 <Loader2 size={24} className="animate-spin" />
-                <span>Creating Order...</span>
+                <span>Updating Order...</span>
               </>
             ) : (
               <>
-                <Plus size={24} />
-                <span>Create Order</span>
+                <Save size={24} />
+                <span>Update Order</span>
               </>
             )}
           </Button>
         </div>
       </form>
-
-      {/* Success Modal */}
-      <Modal open={showSuccessModal}>
-        <div className="p-6">
-          <h2 className="text-xl font-bold mb-4 text-green-700">Order Created Successfully!</h2>
-          {lastOrderSummary && (
-            <div className="space-y-2">
-              <div><span className="font-medium">Order ID:</span> {lastOrderSummary.id}</div>
-              <div><span className="font-medium">Order Code:</span> {lastOrderSummary.code}</div>
-              <div><span className="font-medium">Customer:</span> {lastOrderSummary.customer_name}</div>
-              <div><span className="font-medium">Order Price:</span> {lastOrderSummary.order_price} EGP</div>
-            </div>
-          )}
-          <div className="flex flex-col gap-3 mt-6">
-            <Button className="w-full"   onClick={() => { 
-              setShowSuccessModal(false);
-              window.location.reload(); // Reload current page
-            }}>
-              Close
-            </Button>
-            <Button className="w-full" variant="outline" onClick={handleCopyToClipboard}>
-              <Copy className="inline-block mr-2" /> Copy Details
-            </Button>
-          </div>
-        </div>
-      </Modal>
-    </>
+    </div>
   );
 };
 
-// Fallback Modal if not present
-const Modal = ({ open, onClose, children }: any) => open ? (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-    <div className="bg-white rounded-lg shadow-lg max-w-md w-full relative">
-      <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600" onClick={onClose}>×</button>
-      {children}
-    </div>
-  </div>
-) : null;
-
-export default NewOrder;
+export default EditSaleOrder;

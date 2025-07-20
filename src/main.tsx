@@ -4,10 +4,6 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './index.css';
 
-
-
-
-
 const root = document.getElementById('root');
 
 if (!root) {
@@ -16,8 +12,8 @@ if (!root) {
 
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <BrowserRouter>
-    <App />
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <App />
     </BrowserRouter>
   </React.StrictMode>
 );

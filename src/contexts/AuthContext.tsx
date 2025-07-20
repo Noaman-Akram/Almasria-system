@@ -14,6 +14,7 @@ interface AuthContextType {
   confirmPasswordReset: (oobCode: string, newPassword: string) => Promise<void>;
   verifyEmail: (oobCode: string) => Promise<void>;
   isSalesUser: () => boolean;
+  isInternalUser: () => boolean;
   isAdminUser: () => boolean;
 }
 
@@ -59,6 +60,11 @@ const getUserRole = (email: string | undefined): string => {
   // Sales users (limited access to sale orders and scheduling only)
   if (email === '7amza86@gmail.com' || email === 'islamashour000@gmail.com') {
     return 'sales';
+  }
+
+   // Internal users (limited access to sale orders and scheduling only)
+   if (email === 'a.s.g.s.1991@gmail.com' || email === 'internal@pass123.com') {
+    return 'internal';
   }
   
   // Admin users (you can add more admin emails here)
@@ -219,6 +225,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return userRole === 'sales';
   };
 
+  // Helper functions to check user roles
+  const isInternalUser = (): boolean => {
+    return userRole === 'internal';
+  };
+
   const isAdminUser = (): boolean => {
     return userRole === 'admin';
   };
@@ -235,6 +246,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     confirmPasswordReset,
     verifyEmail,
     isSalesUser,
+    isInternalUser,
     isAdminUser,
   };
 

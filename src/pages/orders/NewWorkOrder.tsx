@@ -1,31 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  ArrowLeft,
-  Box,
-  Clock,
-  Calculator,
-  Scissors,
-  Wrench,
-  Truck,
-  Settings,
-  Plus,
-  Trash2,
-  DollarSign,
-  Loader2,
-  Package,
-  Upload,
-  Image,
-} from 'lucide-react';
+import { ArrowLeft, Box, Clock, Calculator, Scissors, Wrench, Truck, Settings, Plus, Trash2, DollarSign, Loader2, Package } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
+import ImageUpload from '../../components/ui/ImageUpload';
 import { supabase } from '../../lib/supabase';
-import { ENGINEERS } from '../../lib/constants';
+import { ENGINEERS, WORK_ORDER_STAGES, STAGE_STATUSES } from '../../lib/constants';
 import SaleOrderSelector from '../../components/orders/SaleOrderSelector';
 import { useAuth } from '../../contexts/AuthContext';
 import Toast from '../../components/ui/Toast';
-import { ImageCompression } from '../../services/ImageCompression';
+import { useImageUpload } from '../../hooks/useImageUpload';
 
+// Valid cost breakdown types that match the database constraint
 const COST_BREAKDOWN_TYPES = [
   {
     value: 'cutting',
@@ -38,12 +24,6 @@ const COST_BREAKDOWN_TYPES = [
     label: 'Finishing',
     icon: Wrench,
     color: 'text-purple-600',
-  },
-  {
-    value: 'material',
-    label: 'Material',
-    icon: Package,
-    color: 'text-green-600',
   },
   {
     value: 'delivery',
@@ -69,10 +49,8 @@ const NewWorkOrder: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageUploading, setImageUploading] = useState(false);
-  const [compressionStatus, setCompressionStatus] = useState<string | null>(null);
   
   const [selectedSaleOrder, setSelectedSaleOrder] = useState<any | null>(null);
   const [workOrderData, setWorkOrderData] = useState({
@@ -83,7 +61,7 @@ const NewWorkOrder: React.FC = () => {
     img_url: '',
   });
 
-  // Initialize with all cost breakdown types by default
+  // Initialize with valid cost breakdown types only
   const [costBreakdown, setCostBreakdown] = useState<CostBreakdownItem[]>([
     {
       type: 'cutting',
@@ -97,14 +75,6 @@ const NewWorkOrder: React.FC = () => {
       type: 'finishing',
       quantity: null,
       unit: 'meter',
-      cost_per_unit: null,
-      total_cost: null,
-      notes: null,
-    },
-    {
-      type: 'material',
-      quantity: null,
-      unit: 'piece',
       cost_per_unit: null,
       total_cost: null,
       notes: null,
@@ -133,6 +103,25 @@ const NewWorkOrder: React.FC = () => {
     message: string;
   } | null>(null);
 
+  // Image upload hook
+  const imageUpload = useImageUpload({
+    bucket: 'word-order-img',
+    folder: 'work-orders',
+    onUploadStart: () => {
+      console.log('[NewWorkOrder] Image upload started');
+    },
+    onUploadComplete: (url) => {
+      console.log('[NewWorkOrder] Image upload completed:', url);
+      setWorkOrderData(prev => ({ ...prev, img_url: url }));
+    },
+    onUploadError: (error) => {
+      console.error('[NewWorkOrder] Image upload failed:', error);
+      setToast({
+        type: 'error',
+        message: `Image upload failed: ${error}`,
+      });
+    },
+  });
   useEffect(() => {
     if (orderId) {
       const fetchSaleOrder = async () => {
@@ -149,9 +138,9 @@ const NewWorkOrder: React.FC = () => {
             .single();
 
           if (error) throw error;
+
           if (data) {
             setSelectedSaleOrder(data);
-
             // Initialize price from sale order
             setWorkOrderData((prev) => ({
               ...prev,
@@ -173,7 +162,6 @@ const NewWorkOrder: React.FC = () => {
 
   const handleSaleOrderSelect = (order: any) => {
     setSelectedSaleOrder(order);
-
     // Initialize price from selected order
     if (order) {
       setWorkOrderData((prev) => ({
@@ -183,45 +171,19 @@ const NewWorkOrder: React.FC = () => {
     }
   };
 
-  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setToast({
-        type: 'error',
-        message: 'Please select an image file',
-      });
-      return;
-    }
-    
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      setToast({
-        type: 'error',
-        message: 'Image size should be less than 10MB',
-      });
-      return;
-    }
-    
-    setSelectedImage(file);
-    
-    // Create and set preview from the original file
-    const previewUrl = await ImageCompression.createPreview(file);
-    setImagePreview(previewUrl);
-    
-    // Show file size info
-    setCompressionStatus(`Original: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+  const handleImageSelect = (file: File, preview: string) => {
+    setSelectedImageFile(file);
+    setImagePreview(preview);
   };
 
-  const removeImage = () => {
-    setSelectedImage(null);
+  const handleImageRemove = () => {
+    setSelectedImageFile(null);
     if (imagePreview) {
       URL.revokeObjectURL(imagePreview);
     }
     setImagePreview(null);
-    setCompressionStatus(null);
+    setWorkOrderData(prev => ({ ...prev, img_url: '' }));
+    imageUpload.reset();
   };
 
   const updateCostBreakdownItem = (
@@ -237,7 +199,6 @@ const NewWorkOrder: React.FC = () => {
         item[field] = value;
       } else if (field === 'quantity' || field === 'cost_per_unit') {
         item[field] = value === '' ? null : Number(value);
-
         // Auto-calculate total cost if both quantity and cost_per_unit are provided
         if (item.quantity !== null && item.cost_per_unit !== null) {
           item.total_cost = item.quantity * item.cost_per_unit;
@@ -289,71 +250,145 @@ const NewWorkOrder: React.FC = () => {
     try {
       if (!user) throw new Error('User not authenticated');
 
+      console.log('[NewWorkOrder] Starting work order creation process');
+
       // 1. Compress and upload image if selected
       let imageUrl = '';
-      if (selectedImage) {
-        setImageUploading(true);
+      if (selectedImageFile) {
         try {
-          // Compress the image before upload
-          setCompressionStatus('Compressing image...');
-          const compressedImage = await ImageCompression.compressImage(selectedImage, 1, 1920);
-          setCompressionStatus(`Compressed: ${(compressedImage.size / 1024 / 1024).toFixed(2)}MB (${(selectedImage.size / compressedImage.size).toFixed(1)}x reduction)`);
-          
           // Generate unique filename
-          const fileExt = compressedImage.name.split('.').pop();
+          const fileExt = selectedImageFile.name.split('.').pop()?.toLowerCase() || 'jpg';
           const fileName = `work-order-${selectedSaleOrder.id}-${Date.now()}.${fileExt}`;
-
-          // Upload file to Supabase storage
-          setCompressionStatus('Uploading compressed image...');
-          const { data, error } = await supabase.storage
-            .from('word-order-img')
-            .upload(fileName, compressedImage, {
-              cacheControl: '3600',
-              upsert: false,
-            });
-
-          if (error) {
-            throw new Error(`Upload failed: ${error.message}`);
-          }
-
-          // Get public URL
-          const { data: urlData } = supabase.storage
-            .from('word-order-img')
-            .getPublicUrl(data.path);
-
-          imageUrl = urlData.publicUrl;
+          
+          imageUrl = await imageUpload.uploadImage(selectedImageFile, fileName);
           console.log('[NewWorkOrder] Image uploaded successfully:', imageUrl);
-          setCompressionStatus('Upload complete!');
+          
         } catch (error) {
           console.error('[NewWorkOrder] Error uploading image:', error);
           setToast({
             type: 'error',
-            message: 'Failed to upload image. Please try again.',
+            message: `Failed to upload image: ${error instanceof Error ? error.message : 'Unknown error'}`,
           });
           setIsSubmitting(false);
-          setImageUploading(false);
           return;
-        } finally {
-          setImageUploading(false);
         }
       }
- 
 
-      // 4. Update sale order status to 'working' (not 'converted')
-      await supabase
+      // 2. Create work order details
+      const totalCost = calculateTotalCost();
+      console.log('[NewWorkOrder] Creating order_details record');
+      
+      const { data: detail, error: detailError } = await supabase
+        .from('order_details')
+        .insert({
+          order_id: selectedSaleOrder.id,
+          assigned_to: workOrderData.assigned_to,
+          due_date: workOrderData.due_date || null,
+          price: workOrderData.price,
+          total_cost: totalCost,
+          notes: workOrderData.notes || null,
+          img_url: imageUrl || null,
+          process_stage: 'not_started',
+        })
+        .select()
+        .single();
+
+      if (detailError) {
+        console.error('[NewWorkOrder] Error creating order_details:', detailError);
+        throw detailError;
+      }
+
+      console.log('[NewWorkOrder] Created order_details:', detail);
+
+      // 3. CRITICAL: Create order_stages for the work order
+      console.log('[NewWorkOrder] Creating order_stages for scheduling');
+      
+      const stages = WORK_ORDER_STAGES.map((stage) => ({
+        order_detail_id: detail.detail_id,
+        stage_name: stage.value,
+        status: STAGE_STATUSES[0].value, // 'not_started'
+        planned_start_date: null,
+        planned_finish_date: null,
+        actual_start_date: null,
+        actual_finish_date: null,
+        notes: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { data: createdStages, error: stagesError } = await supabase
+        .from('order_stages')
+        .insert(stages)
+        .select();
+
+      if (stagesError) {
+        console.error('[NewWorkOrder] Error creating order_stages:', stagesError);
+        throw stagesError;
+      }
+
+      console.log('[NewWorkOrder] Created order_stages:', createdStages);
+
+      // 4. Insert cost breakdown items if provided (only items with costs)
+      if (costBreakdown && costBreakdown.length > 0) {
+        const costBreakdownItems = costBreakdown
+          .filter(item => item.total_cost && item.total_cost > 0) // Only include items with actual costs
+          .map((item) => ({
+            order_detail_id: detail.detail_id,
+            type: item.type, // This should now be one of: cutting, finishing, delivery, other
+            quantity: item.quantity,
+            unit: item.unit,
+            cost_per_unit: item.cost_per_unit,
+            total_cost: item.total_cost,
+            notes: item.notes, // Include notes in the database insert
+            added_by: workOrderData.assigned_to,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }));
+
+        if (costBreakdownItems.length > 0) {
+          console.log('[NewWorkOrder] Inserting cost breakdown items:', costBreakdownItems);
+          
+          const { error: costBreakdownError } = await supabase
+            .from('order_cost_breakdown')
+            .insert(costBreakdownItems);
+
+          if (costBreakdownError) {
+            console.error('[NewWorkOrder] Error creating cost breakdown items:', costBreakdownError);
+            // Don't throw here, we'll still continue with the work order creation
+          } else {
+            console.log('[NewWorkOrder] Created cost breakdown items');
+          }
+        }
+      }
+
+      // 5. Update sale order status to 'working'
+      console.log('[NewWorkOrder] Updating sale order status to working');
+      
+      const { error: orderUpdateError } = await supabase
         .from('orders')
-        .update({ order_status: 'working' })
+        .update({
+          order_status: 'working',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', selectedSaleOrder.id);
+
+      if (orderUpdateError) {
+        console.error('[NewWorkOrder] Error updating order status:', orderUpdateError);
+        throw orderUpdateError;
+      }
+
+      console.log('[NewWorkOrder] Work order creation completed successfully');
 
       setToast({
         type: 'success',
-        message: 'Work order created successfully!',
+        message: 'Work order created successfully with stages for scheduling!',
       });
 
       // Navigate to work orders list after a short delay
       setTimeout(() => {
         navigate('/orders/work');
       }, 2000);
+
     } catch (error) {
       console.error('Error creating work order:', error);
       setToast({
@@ -579,73 +614,14 @@ const NewWorkOrder: React.FC = () => {
         {/* Image Upload */}
         <Card>
           <div className="space-y-6">
-            <div className="flex items-center space-x-2">
-              <Image className="h-5 w-5 text-green-600" />
-              <h3 className="text-lg font-medium text-gray-900">
-                Work Order Image
-              </h3>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Upload Image (Max 10MB)
-                </label>
-                <div className="flex items-center space-x-4">
-                  <label className="cursor-pointer flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-                    <Upload className="h-5 w-5 mr-2" />
-                    <span>Select Image</span>
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handleImageSelect}
-                    />
-                  </label>
-                  {imagePreview && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={removeImage}
-                      className="text-red-600"
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Remove
-                    </Button>
-                  )}
-                </div>
-                {compressionStatus && (
-                  <p className="mt-2 text-xs text-blue-600">{compressionStatus}</p>
-                )}
-                <p className="mt-2 text-xs text-gray-500">
-                  Images will be automatically compressed to save storage while preserving quality.
-                </p>
-              </div>
-              
-              <div>
-                {imageUploading ? (
-                  <div className="flex items-center justify-center h-40 bg-gray-100 rounded-lg">
-                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                  </div>
-                ) : imagePreview ? (
-                  <div className="relative">
-                    <img
-                      src={imagePreview}
-                      alt="Work order preview"
-                      className="h-40 object-contain rounded-lg border border-gray-200"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-40 bg-gray-100 rounded-lg">
-                    <div className="text-center text-gray-400">
-                      <Image className="h-8 w-8 mx-auto mb-2" />
-                      <p>No image selected</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <ImageUpload
+              onImageSelect={handleImageSelect}
+              onImageRemove={handleImageRemove}
+              currentImage={imagePreview}
+              uploading={imageUpload.uploading}
+              disabled={isSubmitting}
+              maxSizeMB={100}
+            />
           </div>
         </Card>
 
@@ -733,6 +709,21 @@ const NewWorkOrder: React.FC = () => {
                     </div>
                   </div>
                 </div>
+                {/* Notes for Cutting */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    value={costBreakdown[0].notes || ''}
+                    onChange={(e) =>
+                      updateCostBreakdownItem(0, 'notes', e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                    rows={2}
+                    placeholder="Add notes for cutting costs..."
+                  />
+                </div>
               </div>
 
               {/* Finishing */}
@@ -808,80 +799,20 @@ const NewWorkOrder: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Material */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="flex items-center space-x-2 mb-3">
-                  <Package className="h-4 w-4 text-green-600" />
-                  <h4 className="font-medium text-gray-900">Material</h4>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Cost per Unit (EGP)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={costBreakdown[2].cost_per_unit || ''}
-                      onChange={(e) =>
-                        updateCostBreakdownItem(
-                          2,
-                          'cost_per_unit',
-                          e.target.value
-                        )
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Quantity
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={costBreakdown[2].quantity || ''}
-                      onChange={(e) =>
-                        updateCostBreakdownItem(2, 'quantity', e.target.value)
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Total Cost (Auto-calculated)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={costBreakdown[2].total_cost || ''}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
-                      placeholder="0.00"
-                      readOnly
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <div className="text-sm text-gray-600">
-                      {costBreakdown[2].cost_per_unit &&
-                      costBreakdown[2].quantity ? (
-                        <span className="text-green-600 font-medium">
-                          {costBreakdown[2].cost_per_unit} ×{' '}
-                          {costBreakdown[2].quantity} ={' '}
-                          {costBreakdown[2].total_cost?.toFixed(2)} EGP
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">
-                          Enter cost and quantity
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                {/* Notes for Finishing */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    value={costBreakdown[1].notes || ''}
+                    onChange={(e) =>
+                      updateCostBreakdownItem(1, 'notes', e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                    rows={2}
+                    placeholder="Add notes for finishing costs..."
+                  />
                 </div>
               </div>
 
@@ -900,9 +831,9 @@ const NewWorkOrder: React.FC = () => {
                       type="number"
                       step="0.01"
                       min="0"
-                      value={costBreakdown[3].total_cost || ''}
+                      value={costBreakdown[2].total_cost || ''}
                       onChange={(e) =>
-                        updateCostBreakdownItem(3, 'total_cost', e.target.value)
+                        updateCostBreakdownItem(2, 'total_cost', e.target.value)
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
                       placeholder="0.00"
@@ -913,6 +844,21 @@ const NewWorkOrder: React.FC = () => {
                       Direct cost input
                     </div>
                   </div>
+                </div>
+                {/* Notes for Delivery */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    value={costBreakdown[2].notes || ''}
+                    onChange={(e) =>
+                      updateCostBreakdownItem(2, 'notes', e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                    rows={2}
+                    placeholder="Add notes for delivery costs..."
+                  />
                 </div>
               </div>
 
@@ -931,9 +877,9 @@ const NewWorkOrder: React.FC = () => {
                       type="number"
                       step="0.01"
                       min="0"
-                      value={costBreakdown[4].total_cost || ''}
+                      value={costBreakdown[3].total_cost || ''}
                       onChange={(e) =>
-                        updateCostBreakdownItem(4, 'total_cost', e.target.value)
+                        updateCostBreakdownItem(3, 'total_cost', e.target.value)
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
                       placeholder="0.00"
@@ -944,6 +890,21 @@ const NewWorkOrder: React.FC = () => {
                       Miscellaneous costs
                     </div>
                   </div>
+                </div>
+                {/* Notes for Other */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    value={costBreakdown[3].notes || ''}
+                    onChange={(e) =>
+                      updateCostBreakdownItem(3, 'notes', e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                    rows={2}
+                    placeholder="Add notes for other costs..."
+                  />
                 </div>
               </div>
 
@@ -989,6 +950,7 @@ const NewWorkOrder: React.FC = () => {
                 Order Summary
               </h3>
             </div>
+
             <div className="bg-gray-50 rounded-lg p-4 space-y-4">
               <div className="flex items-center justify-between text-lg">
                 <span className="font-medium text-gray-700">Order Price:</span>
@@ -1043,12 +1005,12 @@ const NewWorkOrder: React.FC = () => {
             type="submit"
             size="lg"
             className="w-full md:w-auto flex items-center justify-center space-x-2 text-lg py-4"
-            disabled={isSubmitting || imageUploading}
+            disabled={isSubmitting || imageUpload.uploading}
           >
-            {isSubmitting || imageUploading ? (
+            {isSubmitting || imageUpload.uploading ? (
               <>
                 <Loader2 size={24} className="animate-spin" />
-                <span>Creating Work Order...</span>
+                <span>{imageUpload.uploading ? 'Uploading Image...' : 'Creating Work Order...'}</span>
               </>
             ) : (
               <>

@@ -13,6 +13,7 @@ import Layout from './components/layout/Layout';
 import CustomersList from './pages/customers/CustomersList';
 import SaleOrdersList from './pages/orders/sale/SaleOrdersList';
 import NewSaleOrder from './pages/orders/sale/NewSaleOrder';
+import EditSaleOrder from './pages/orders/sale/EditSaleOrder';
 import WorkOrdersList from './pages/orders/WorkOrdersList';
 import NewWorkOrder from './pages/orders/NewWorkOrder';
 import Tables from './pages/Tables';
@@ -20,7 +21,7 @@ import SchedulingPage from './pages/scheduling/SchedulingPage';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode; allowedRoles?: string[] }> = ({ 
   children, 
-  allowedRoles = ['admin', 'sales', 'user'] 
+  allowedRoles = ['admin', 'sales', 'user', 'internal'] 
 }) => {
   const { user, userRole, loading } = useAuth();
 
@@ -90,7 +91,7 @@ const AppRoutes: React.FC = () => {
     
       {/* Protected Routes */}
       <Route path="/" element={
-        <PrivateRoute allowedRoles={['admin', 'sales', 'user']}>
+        <PrivateRoute allowedRoles={['admin', 'sales', 'user', 'internal']}>
           <Layout>
             <Dashboard />
           </Layout>
@@ -106,16 +107,18 @@ const AppRoutes: React.FC = () => {
         </PrivateRoute>
       } />
       
+      {/* Work Orders List - Admin and Internal only (Sales CANNOT access) */}
       <Route path="/orders/work" element={
-        <PrivateRoute allowedRoles={['admin']}>
+        <PrivateRoute allowedRoles={['admin', 'internal']}>
           <Layout>
             <WorkOrdersList />
           </Layout>
         </PrivateRoute>
       } />
 
+      {/* Work Order Creation - Admin, Internal, and Sales can create */}
       <Route path="/orders/work/new/:orderId?" element={
-        <PrivateRoute allowedRoles={['admin']}>
+        <PrivateRoute allowedRoles={['admin', 'internal', 'sales']}>
           <Layout>
             <NewWorkOrder />
           </Layout>
@@ -155,8 +158,17 @@ const AppRoutes: React.FC = () => {
         </PrivateRoute>
       } />
 
-      <Route path="/scheduling" element={
+      {/* Sale Order Edit Route */}
+      <Route path="/orders/sale/edit/:orderId" element={
         <PrivateRoute allowedRoles={['admin', 'sales']}>
+          <Layout>
+            <EditSaleOrder />
+          </Layout>
+        </PrivateRoute>
+      } />
+
+      <Route path="/scheduling" element={
+        <PrivateRoute allowedRoles={['admin', 'sales', 'internal']}>
           <Layout>
             <SchedulingPage />
           </Layout>

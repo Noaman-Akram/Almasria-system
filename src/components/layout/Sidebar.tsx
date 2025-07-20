@@ -51,7 +51,8 @@ const allNavItems: NavItem[] = [
 // Define which pages each role can access
 const rolePermissions = {
   admin: ['/', '/customers', '/orders/sale', '/orders/work', '/scheduling', '/tables', '/settings'],
-  sales: ['/', '/orders/sale', '/scheduling'], // Sales users can only access dashboard, sale orders, and scheduling
+  sales: ['/', '/orders/sale', '/scheduling'], // Sales users can only access dashboard, sale orders, and scheduling (NO work orders list)
+  internal: ['/', '/orders/work', '/scheduling'], // Internal users can only access dashboard, work orders, and scheduling
   user: ['/', '/orders/sale'] // Default users get minimal access
 };
 
@@ -114,7 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                             (item.path !== '/' && location.pathname.startsWith(item.path));
               const isWorkOrders = item.path === '/orders/work';
               const isSaleOrders = item.path === '/orders/sale';
-              const canCreateNew = userRole === 'admin' || userRole === 'sales'; // Both admin and sales can create orders
+              const canCreateNew = userRole === 'admin' || userRole === 'sales' || userRole === 'internal';
               
               return (
                 <li key={item.path} className="group flex items-center">

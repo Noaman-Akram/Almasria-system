@@ -2,6 +2,7 @@ import React from 'react';
 import { Bell, Search, User, Menu, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../components/ui/button';
+import GoogleTranslate from '../ui/GoogleTranslate';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -46,6 +47,11 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           <Bell size={20} />
           <span className="absolute top-1 right-1 bg-red-500 rounded-full w-2 h-2"></span>
         </button>
+
+        {/* Google Translate - positioned with proper spacing */}
+        <div className="hidden sm:flex">
+          <GoogleTranslate />
+        </div>
         
         <div className="flex items-center space-x-3">
           <div className="text-right hidden sm:block">
@@ -68,6 +74,11 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           >
             <LogOut size={16} />
           </Button>
+        </div>
+
+        {/* Mobile Google Translate */}
+        <div className="sm:hidden">
+          <GoogleTranslate />
         </div>
       </div>
     </header>

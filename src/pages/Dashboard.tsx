@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   Users,
+  FileText,
+  Hammer,
+  Calendar,
   ClipboardList,
   DollarSign,
   TrendingUp,
@@ -9,8 +12,6 @@ import {
   Target,
   Activity,
   RefreshCw,
-  FileText,
-  Calendar,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import StatsCard from '../components/ui/StatsCard';
@@ -251,23 +252,23 @@ const Dashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    // Only fetch data for admin and user roles, not for sales
-    if (userRole === 'admin' || userRole === 'user') {
+    // Only fetch data for admin users
+    if (userRole === 'admin') {
       fetchDashboardData();
     } else {
       setLoading(false);
     }
   }, [userRole]);
 
-  // Sales Dashboard - Simple navigation cards
-  if (userRole === 'sales') {
+  // Non-Admin Dashboard - Simple Quick Links
+  if (userRole !== 'admin') {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-gray-900 flex items-center gap-3">
               <LayoutDashboard size={28} />
-              Sales Dashboard
+              Dashboard
             </h1>
             <p className="text-gray-600 mt-1">
               Welcome! Access your available features below
@@ -275,34 +276,70 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Quick Access Cards for Sales Users */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/orders/sale')}>
-            <div className="p-6 text-center">
-              <div className="bg-blue-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                <FileText size={32} className="text-blue-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Sale Orders</h3>
-              <p className="text-gray-600 mb-4">View and manage sale orders</p>
-              <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium">
-                Click to Access
-              </div>
-            </div>
-          </Card>
+        {/* Quick Access Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Sale Orders - Available for sales and admin */}
+          {(userRole === 'sales' || userRole === 'admin') && (
+            <>
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/orders/sale')}>
+                <div className="p-6 text-center">
+                  <div className="bg-blue-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                    <FileText size={32} className="text-blue-600" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Sale Orders</h3>
+                  <p className="text-gray-600 mb-4">View and manage sale orders</p>
+                  <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium">
+                    Click to Access
+                  </div>
+                </div>
+              </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/orders/sale/new')}>
-            <div className="p-6 text-center">
-              <div className="bg-green-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                <ClipboardList size={32} className="text-green-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">New Sale Order</h3>
-              <p className="text-gray-600 mb-4">Create a new sale order</p>
-              <div className="bg-green-50 text-green-700 px-4 py-2 rounded-lg text-sm font-medium">
-                Click to Create
-              </div>
-            </div>
-          </Card>
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/orders/sale/new')}>
+                <div className="p-6 text-center">
+                  <div className="bg-green-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                    <ClipboardList size={32} className="text-green-600" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">New Sale Order</h3>
+                  <p className="text-gray-600 mb-4">Create a new sale order</p>
+                  <div className="bg-green-50 text-green-700 px-4 py-2 rounded-lg text-sm font-medium">
+                    Click to Create
+                  </div>
+                </div>
+              </Card>
 
+              {/* Convert to Work Order - Available for sales users */}
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/orders/work/new')}>
+                <div className="p-6 text-center">
+                  <div className="bg-orange-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                    <Hammer size={32} className="text-orange-600" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Create Work Order</h3>
+                  <p className="text-gray-600 mb-4">Convert sale orders to work orders</p>
+                  <div className="bg-orange-50 text-orange-700 px-4 py-2 rounded-lg text-sm font-medium">
+                    Click to Create
+                  </div>
+                </div>
+              </Card>
+            </>
+          )}
+
+          {/* Work Orders - Available for internal and admin only (NOT sales) */}
+          {(userRole === 'internal' || userRole === 'admin') && (
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/orders/work')}>
+              <div className="p-6 text-center">
+                <div className="bg-orange-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                  <Hammer size={32} className="text-orange-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Work Orders</h3>
+                <p className="text-gray-600 mb-4">View and manage work orders</p>
+                <div className="bg-orange-50 text-orange-700 px-4 py-2 rounded-lg text-sm font-medium">
+                  Click to Access
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Scheduling - Available for all roles */}
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/scheduling')}>
             <div className="p-6 text-center">
               <div className="bg-purple-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
@@ -316,33 +353,48 @@ const Dashboard: React.FC = () => {
             </div>
           </Card>
 
+          {/* User Role Info */}
           <Card className="hover:shadow-lg transition-shadow">
             <div className="p-6 text-center">
               <div className="bg-gray-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
                 <Activity size={32} className="text-gray-600" />
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Your Role</h3>
-              <p className="text-gray-600 mb-4">Sales Representative</p>
+              <p className="text-gray-600 mb-4 capitalize">{userRole || 'User'}</p>
               <div className="bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">
-                Limited Access
+                {userRole === 'admin' ? 'Full Access' : userRole === 'sales' ? 'Sales Access + Work Order Creation' : 'Limited Access'}
               </div>
             </div>
           </Card>
         </div>
 
-        {/* Quick Tips for Sales Users */}
+        {/* Quick Tips */}
         <Card>
           <div className="p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Tips</h3>
             <div className="space-y-3 text-sm text-gray-600">
-              <div className="flex items-start space-x-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                <p>Use <strong>Sale Orders</strong> to view all your existing orders and their status</p>
-              </div>
-              <div className="flex items-start space-x-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
-                <p>Create <strong>New Sale Orders</strong> for customers with detailed measurements</p>
-              </div>
+              {(userRole === 'sales' || userRole === 'admin') && (
+                <>
+                  <div className="flex items-start space-x-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                    <p>Use <strong>Sale Orders</strong> to view all your existing orders and their status</p>
+                  </div>
+                  <div className="flex items-start space-x-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                    <p>Create <strong>New Sale Orders</strong> for customers with detailed measurements</p>
+                  </div>
+                  <div className="flex items-start space-x-2">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
+                    <p>Convert sale orders to <strong>Work Orders</strong> when ready for production</p>
+                  </div>
+                </>
+              )}
+              {(userRole === 'internal' || userRole === 'admin') && (
+                <div className="flex items-start space-x-2">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
+                  <p>Manage <strong>Work Orders</strong> to track production progress</p>
+                </div>
+              )}
               <div className="flex items-start space-x-2">
                 <div className="w-2 h-2 bg-purple-500 rounded-full mt-2"></div>
                 <p>Check <strong>Scheduling</strong> to see work assignments and timelines</p>
@@ -354,7 +406,7 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  // Admin/User Dashboard - Full analytics
+  // Admin Dashboard - Full analytics (existing code)
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -634,7 +686,7 @@ const Dashboard: React.FC = () => {
         {/* Average Order Value */}
         <Card title="Monthly Orders">
           <div className="h-80">
-            <Bar data={ordersChartData} options={chartOptions as any  } />
+            <Bar data={ordersChartData} options={chartOptions as any} />
           </div>
         </Card>
       </div>
