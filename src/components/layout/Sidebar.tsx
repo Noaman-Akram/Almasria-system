@@ -162,7 +162,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         {!collapsed && (
           <div className="space-y-4">
             <div className="text-xs text-gray-400">
-              <div>Version 1.0.4</div>
+              <div>Version 1.1</div>
               <div className="mt-1">
                 Role: <span className="text-blue-400 font-medium">{userRole || 'user'}</span>
               </div>
