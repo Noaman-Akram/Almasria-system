@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Box, Clock, Calculator, Scissors, Wrench, Truck, Settings, Plus, Trash2, DollarSign, Loader2, Package } from 'lucide-react';
+import { ArrowLeft, Box, Clock, Calculator, Scissors, Wrench, Truck, Settings, Plus, DollarSign, Loader2 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import ImageUpload from '../../components/ui/ImageUpload';

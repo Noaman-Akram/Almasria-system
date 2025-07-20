@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { ImageCompression } from '../services/ImageCompression';
 
 interface UseImageUploadOptions {
   bucket: string;

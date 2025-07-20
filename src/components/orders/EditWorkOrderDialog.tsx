@@ -1,14 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   X,
-  User,
-  Building2,
-  Phone,
-  MapPin,
   Box,
   Clock,
-  Trash2,
-  Plus,
   DollarSign,
   Loader2,
   Calculator,
@@ -16,18 +10,13 @@ import {
   Wrench,
   Truck,
   Settings,
-  Package,
-  ArrowLeft,
 } from 'lucide-react';
 import { WorkOrderDetail } from '../../types/order';
 import { supabase } from '../../lib/supabase';
 import Button from '../ui/Button';
 import ImageUpload from '../ui/ImageUpload';
 import {
-  WORK_TYPES,
   ENGINEERS,
-  WORK_ORDER_STAGES,
-  STAGE_STATUSES,
 } from '../../lib/constants';
 import { useImageUpload } from '../../hooks/useImageUpload';
 
