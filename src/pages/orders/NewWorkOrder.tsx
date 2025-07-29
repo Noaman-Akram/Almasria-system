@@ -49,8 +49,9 @@ const NewWorkOrder: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  // Replace single image state with multiple images
+  const [selectedImageFiles, setSelectedImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   
   const [selectedSaleOrder, setSelectedSaleOrder] = useState<any | null>(null);
   const [workOrderData, setWorkOrderData] = useState({
@@ -58,7 +59,7 @@ const NewWorkOrder: React.FC = () => {
     due_date: '',
     price: 0,
     notes: '',
-    img_url: '',
+    img_urls: [],
   });
 
   // Initialize with valid cost breakdown types only
@@ -112,7 +113,7 @@ const NewWorkOrder: React.FC = () => {
     },
     onUploadComplete: (url) => {
       console.log('[NewWorkOrder] Image upload completed:', url);
-      setWorkOrderData(prev => ({ ...prev, img_url: url }));
+      // setWorkOrderData(prev => ({ ...prev, img_url: url })); // This line is no longer needed
     },
     onUploadError: (error) => {
       console.error('[NewWorkOrder] Image upload failed:', error);
@@ -171,19 +172,14 @@ const NewWorkOrder: React.FC = () => {
     }
   };
 
-  const handleImageSelect = (file: File, preview: string) => {
-    setSelectedImageFile(file);
-    setImagePreview(preview);
+  // Replace handleImageSelect and handleImageRemove with multi-image logic
+  const handleImagesSelect = (files: File[], previews: string[]) => {
+    setSelectedImageFiles(files);
+    setImagePreviews(previews);
   };
-
-  const handleImageRemove = () => {
-    setSelectedImageFile(null);
-    if (imagePreview) {
-      URL.revokeObjectURL(imagePreview);
-    }
-    setImagePreview(null);
-    setWorkOrderData(prev => ({ ...prev, img_url: '' }));
-    imageUpload.reset();
+  const handleImageRemove = (index: number) => {
+    setSelectedImageFiles(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const updateCostBreakdownItem = (
@@ -252,27 +248,16 @@ const NewWorkOrder: React.FC = () => {
 
       console.log('[NewWorkOrder] Starting work order creation process');
 
-      // 1. Compress and upload image if selected
-      let imageUrl = '';
-      if (selectedImageFile) {
-        try {
-          // Generate unique filename
-          const fileExt = selectedImageFile.name.split('.').pop()?.toLowerCase() || 'jpg';
-          const fileName = `work-order-${selectedSaleOrder.id}-${Date.now()}.${fileExt}`;
-          
-          imageUrl = await imageUpload.uploadImage(selectedImageFile, fileName);
-          console.log('[NewWorkOrder] Image uploaded successfully:', imageUrl);
-          
-        } catch (error) {
-          console.error('[NewWorkOrder] Error uploading image:', error);
-          setToast({
-            type: 'error',
-            message: `Failed to upload image: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          });
-          setIsSubmitting(false);
-          return;
-        }
+      // Upload all selected images
+      let imageUrls: string[] = [];
+      for (let i = 0; i < selectedImageFiles.length; i++) {
+        const file = selectedImageFiles[i];
+        const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+        const fileName = `work-order-${selectedSaleOrder.id}-${Date.now()}-${i}.${fileExt}`;
+        const url = await imageUpload.uploadImage(file, fileName);
+        imageUrls.push(url);
       }
+      console.log('[NewWorkOrder] Image uploaded successfully:', imageUrls);
 
       // 2. Create work order details
       const totalCost = calculateTotalCost();
@@ -287,7 +272,7 @@ const NewWorkOrder: React.FC = () => {
           price: workOrderData.price,
           total_cost: totalCost,
           notes: workOrderData.notes || null,
-          img_url: imageUrl || null,
+          img_urls: imageUrls,
           process_stage: 'not_started',
         })
         .select()
@@ -615,9 +600,9 @@ const NewWorkOrder: React.FC = () => {
         <Card>
           <div className="space-y-6">
             <ImageUpload
-              onImageSelect={handleImageSelect}
+              onImagesSelect={handleImagesSelect}
               onImageRemove={handleImageRemove}
-              currentImage={imagePreview}
+              currentImages={imagePreviews}
               uploading={imageUpload.uploading}
               disabled={isSubmitting}
               maxSizeMB={100}

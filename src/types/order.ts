@@ -80,7 +80,7 @@ export interface CreateOrderDTO {
 }
 
 export interface WorkOrderDetail {
-  img_url: string;
+  img_urls: string[];
   detail_id: string;
   order_id: string;
   assigned_to: string;
@@ -99,7 +99,7 @@ export interface WorkOrderDetail {
     address: string;
     work_types: string[];
     created_at: string;
-    img_url?: string;
+    img_urls?: string[];
     customer?: {
       id: number;
       name: string;
@@ -160,7 +160,7 @@ export interface CreateWorkOrderDTO {
   price: number;
   total_cost: number;
   notes: string;
-  img_url: string;
+  img_urls: string[];
   cost_breakdown?: Omit<
     OrderCostBreakdown,
     'id' | 'order_detail_id' | 'created_at' | 'updated_at'

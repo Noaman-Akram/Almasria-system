@@ -85,16 +85,16 @@ const EditWorkOrderDialog = ({
   onClose,
   onSave,
 }: EditWorkOrderDialogProps) => {
-  const [selectedSaleOrder, setSelectedSaleOrder] = useState<any | null>(null);
-  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(workOrder.img_url || null);
+  // Replace single image state with multiple images
+  const [selectedImageFiles, setSelectedImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>(workOrder.img_urls || []);
   
   const [workOrderData, setWorkOrderData] = useState({
     assigned_to: workOrder.assigned_to,
     due_date: workOrder.due_date ? workOrder.due_date.split('T')[0] : '',
     price: workOrder.price,
     notes: workOrder.notes || '',
-    img_url: workOrder.img_url || '',
+    img_urls: workOrder.img_urls || [],
   });
 
   // Initialize with valid cost breakdown types only
@@ -117,7 +117,7 @@ const EditWorkOrderDialog = ({
     },
     onUploadComplete: (url) => {
       console.log('[EditWorkOrderDialog] Image upload completed:', url);
-      setWorkOrderData(prev => ({ ...prev, img_url: url }));
+      // setWorkOrderData(prev => ({ ...prev, img_url: url })); // This line is no longer needed for single image
     },
     onUploadError: (error) => {
       console.error('[EditWorkOrderDialog] Image upload failed:', error);
@@ -147,7 +147,7 @@ const EditWorkOrderDialog = ({
         if (error) throw error;
 
         if (data && isMounted) {
-          setSelectedSaleOrder(data);
+          // setSelectedSaleOrder(data); // This line is no longer needed for single image
           // Update price from sale order if not already set
           if (!workOrderData.price && data.order_price) {
             setWorkOrderData((prev) => ({
@@ -171,19 +171,14 @@ const EditWorkOrderDialog = ({
     // eslint-disable-next-line
   }, [workOrder.cost_breakdown]);
 
-  const handleImageSelect = (file: File, preview: string) => {
-    setSelectedImageFile(file);
-    setImagePreview(preview);
+  // Replace handleImageSelect and handleImageRemove with multi-image logic
+  const handleImagesSelect = (files: File[], previews: string[]) => {
+    setSelectedImageFiles(files);
+    setImagePreviews(previews);
   };
-
-  const handleImageRemove = () => {
-    setSelectedImageFile(null);
-    if (imagePreview && !workOrder.img_url) {
-      URL.revokeObjectURL(imagePreview);
-    }
-    setImagePreview(null);
-    setWorkOrderData(prev => ({ ...prev, img_url: '' }));
-    imageUpload.reset();
+  const handleImageRemove = (index: number) => {
+    setSelectedImageFiles(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const updateCostBreakdownItem = (
@@ -225,6 +220,11 @@ const EditWorkOrderDialog = ({
   };
 
   const validateForm = () => {
+    if (!selectedImageFiles.length) { // Check if any images are selected
+      setToast({ type: 'error', message: 'Please select at least one image' });
+      return false;
+    }
+
     if (!selectedSaleOrder) {
       setToast({ type: 'error', message: 'Sale order not found' });
       return false;
@@ -250,27 +250,16 @@ const EditWorkOrderDialog = ({
     try {
       console.log('[EditWorkOrderDialog] Starting work order update process');
 
-      // 1. Compress and upload image if selected
-      let imageUrl = workOrderData.img_url;
-      if (selectedImageFile) {
-        try {
-          // Generate unique filename
-          const fileExt = selectedImageFile.name.split('.').pop()?.toLowerCase() || 'jpg';
-          const fileName = `work-order-${workOrder.detail_id}-${Date.now()}.${fileExt}`;
-          
-          imageUrl = await imageUpload.uploadImage(selectedImageFile, fileName);
-          console.log('[EditWorkOrderDialog] Image uploaded successfully:', imageUrl);
-          
-        } catch (error) {
-          console.error('[EditWorkOrderDialog] Error uploading image:', error);
-          setToast({
-            type: 'error',
-            message: `Failed to upload image: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          });
-          setIsSubmitting(false);
-          return;
-        }
+      // Upload all selected images
+      let imageUrls: string[] = [];
+      for (let i = 0; i < selectedImageFiles.length; i++) {
+        const file = selectedImageFiles[i];
+        const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+        const fileName = `work-order-${workOrder.order_id}-${Date.now()}-${i}.${fileExt}`;
+        const url = await imageUpload.uploadImage(file, fileName);
+        imageUrls.push(url);
       }
+      console.log('[EditWorkOrderDialog] All images uploaded successfully:', imageUrls);
 
       // 2. Update work order details
       const totalCost = calculateTotalCost();
@@ -282,7 +271,7 @@ const EditWorkOrderDialog = ({
         price: workOrderData.price,
         total_cost: totalCost,
         notes: workOrderData.notes || null,
-        img_url: imageUrl || null,
+        img_urls: imageUrls,
         process_stage: workOrder.process_stage,
         updated_at: new Date().toISOString(),
       };
@@ -292,14 +281,23 @@ const EditWorkOrderDialog = ({
         updateData.due_date = new Date(workOrderData.due_date).toISOString();
       }
 
-      const { error: detailError } = await supabase
+      const { data, error } = await supabase
         .from('order_details')
-        .update(updateData)
-        .eq('detail_id', workOrder.detail_id);
+        .update({
+          assigned_to: workOrderData.assigned_to,
+          due_date: workOrderData.due_date || null,
+          price: workOrderData.price,
+          notes: workOrderData.notes || null,
+          img_urls: imageUrls,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('detail_id', workOrder.detail_id)
+        .select()
+        .single();
 
-      if (detailError) {
-        console.error('[EditWorkOrderDialog] Error updating order_details:', detailError);
-        throw detailError;
+      if (error) {
+        console.error('[EditWorkOrderDialog] Error updating order_details:', error);
+        throw error;
       }
 
       console.log('[EditWorkOrderDialog] Updated order_details successfully');
@@ -569,12 +567,11 @@ const EditWorkOrderDialog = ({
           {/* Image Upload */}
           <div className="space-y-6">
             <ImageUpload
-              onImageSelect={handleImageSelect}
+              onImagesSelect={handleImagesSelect}
               onImageRemove={handleImageRemove}
-              currentImage={imagePreview}
+              currentImages={imagePreviews}
               uploading={imageUpload.uploading}
               disabled={isSubmitting}
-              maxSizeMB={100}
             />
           </div>
 

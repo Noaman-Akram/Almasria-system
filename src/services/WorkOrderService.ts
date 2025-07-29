@@ -21,7 +21,7 @@ export class WorkOrderService {
         price,
         total_cost,
         notes,
-        img_url,
+        img_urls,
         updated_at,
         order:orders!inner (
           id,
@@ -68,7 +68,7 @@ export class WorkOrderService {
         price: item.price,
         total_cost: item.total_cost,
         notes: item.notes,
-        img_url: item.img_url,
+        img_urls: item.img_urls,
         updated_at: item.updated_at,
         order: orderData ? {
           id: orderData.id.toString(),
@@ -104,7 +104,7 @@ export class WorkOrderService {
           price: dto.price,
           total_cost: dto.total_cost,
           notes: dto.notes,
-          img_url: dto.img_url,
+          img_urls: dto.img_urls,
           process_stage: STAGE_STATUSES[0].value, // Set initial status to 'not_started'
         })
         .select()
@@ -164,7 +164,7 @@ export class WorkOrderService {
         price: detail.price,
         total_cost: detail.total_cost,
         notes: detail.notes,
-        img_url: detail.img_url,
+        img_urls: detail.img_urls,
         updated_at: detail.updated_at,
         cost_breakdown: dto.cost_breakdown ? dto.cost_breakdown.map(item => ({
           id: 0, // Will be set by database

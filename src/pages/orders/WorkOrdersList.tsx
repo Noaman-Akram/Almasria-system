@@ -47,6 +47,7 @@ interface WorkOrder {
   total_cost: number;
   notes?: string;
   img_url?: string;
+  img_urls?: string[]; // Changed from img_url to img_urls
   cost_breakdown?: OrderCostBreakdown[];
   order?: {
     id: string;
@@ -97,6 +98,12 @@ interface WorkOrder {
 }
 
 type SortableField = keyof WorkOrder | 'customer_name' | 'code';
+
+// Add this helper at the top of the file
+const getImageUrls = (imgUrls: string[] | null | undefined) => {
+  if (!imgUrls || imgUrls.length === 0) return [];
+  return imgUrls;
+};
 
 // Image Modal Component
 const ImageModal = ({ isOpen, onClose, imageUrl, orderCode }: { isOpen: boolean, onClose: () => void, imageUrl: string, orderCode: string }) => {
@@ -867,7 +874,7 @@ const WorkOrdersList = () => {
                   const stagesInfo = getScheduledStagesInfo(order);
                   const orderCostBreakdowns =
                     costBreakdowns[order.detail_id] || [];
-                  const imageUrl = getImageUrl(order.img_url || null);
+                  const imageUrls = getImageUrls(order.img_urls || null);
 
                   return (
                     <React.Fragment key={order.detail_id}>
@@ -1010,63 +1017,33 @@ const WorkOrdersList = () => {
                                   </div>
                                 </div>
 
-                                {/* Work Order Image */}
-                                {imageUrl && (
+                                {/* Work Order Images */}
+                                {imageUrls.length > 0 && (
                                   <div className="bg-white p-4 rounded-lg border border-gray-200">
                                     <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                                      <ImageIcon
-                                        size={20}
-                                        className="mr-2 text-green-600"
-                                      />
-                                      Work Order Image
+                                      <ImageIcon size={20} className="mr-2 text-green-600" />
+                                      Work Order Images
                                     </h4>
-                                    <div className="flex items-start space-x-4">
-                                      <div
-                                        className="relative cursor-pointer group overflow-hidden rounded-lg border border-gray-200 hover:border-green-300 transition-colors"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          openImageModal(
-                                            imageUrl,
-                                            order.order?.code || order.order_id
-                                          );
-                                        }}
-                                      >
-                                        <img
-                                          src={imageUrl}
-                                          alt={`Work Order ${order.order?.code}`}
-                                          className="w-32 h-32 object-cover group-hover:scale-105 transition-transform duration-200"
-                                          onError={(e) => {
-                                            (e.target as HTMLImageElement).src =
-                                              'https://via.placeholder.com/128x128?text=No+Image';
+                                    <div className="flex flex-wrap gap-4">
+                                      {imageUrls.map((url, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="relative cursor-pointer group overflow-hidden rounded-lg border border-gray-200 hover:border-green-300 transition-colors"
+                                          onClick={e => {
+                                            e.stopPropagation();
+                                            openImageModal(url, order.order?.code || order.order_id);
                                           }}
-                                        />
-                                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
-                                          <Camera
-                                            size={24}
-                                            className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                                        >
+                                          <img
+                                            src={url}
+                                            alt={`Work Order ${order.order?.code} Image ${idx + 1}`}
+                                            className="w-32 h-32 object-cover group-hover:scale-105 transition-transform duration-200"
+                                            onError={e => {
+                                              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/128x128?text=No+Image';
+                                            }}
                                           />
                                         </div>
-                                      </div>
-                                      <div className="flex-1">
-                                        <p className="text-sm text-gray-600 mb-2">
-                                          Click the image to view it in full
-                                          size
-                                        </p>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            openImageModal(
-                                              imageUrl,
-                                              order.order?.code ||
-                                                order.order_id
-                                            );
-                                          }}
-                                          className="text-green-600 hover:text-green-700 text-sm font-medium flex items-center space-x-1 hover:underline"
-                                        >
-                                          <ImageIcon size={16} />
-                                          <span>View Full Size</span>
-                                        </button>
-                                      </div>
+                                      ))}
                                     </div>
                                   </div>
                                 )}

@@ -29,6 +29,7 @@ interface OrderDetail {
   total_cost?: number;
   notes?: string;
   img_url?: string;
+  img_urls?: string[]; // Changed from img_url to img_urls
   process_stage?: string;
   updated_at?: string;
 }
@@ -199,6 +200,23 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
                             {detail.total_cost?.toLocaleString()} EGP
                           </td>
                           <td className="px-2 py-1">{detail.process_stage}</td>
+                          {detail.img_urls && detail.img_urls.length > 0 && (
+                            <td className="px-2 py-1">
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {detail.img_urls.map((url, idx) => (
+                                  <img
+                                    key={idx}
+                                    src={url}
+                                    alt={`Work Order Image ${idx + 1}`}
+                                    className="h-20 w-20 object-cover rounded border border-gray-200 bg-gray-50"
+                                    onError={e => {
+                                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/80x80?text=No+Image';
+                                    }}
+                                  />
+                                ))}
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
