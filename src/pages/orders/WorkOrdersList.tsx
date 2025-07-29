@@ -25,7 +25,6 @@ import {
   CalendarClock,
   Calculator,
   Printer,
-  Camera,
   Image as ImageIcon,
   X,
 } from 'lucide-react';
@@ -360,21 +359,6 @@ const WorkOrdersList = () => {
   };
 
   // Get image URL from Supabase storage
-  const getImageUrl = (imgUrl: string | null) => {
-    if (!imgUrl) return null;
-
-    // If it's already a full URL, return as is
-    if (imgUrl.startsWith('http')) {
-      return imgUrl;
-    }
-
-    // Otherwise, construct the Supabase storage URL
-    const { data } = supabase.storage
-      .from('word-order-img')
-      .getPublicUrl(imgUrl);
-
-    return data.publicUrl;
-  };
 
   // Print work order function
   const handlePrintWorkOrder = (order: WorkOrder) => {

@@ -1,6 +1,5 @@
 import React, { useState, useCallback } from 'react';
 import { Upload, Image, Trash2, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
-import Button from './Button';
 import { ImageCompression, CompressionResult } from '../../services/ImageCompression';
 
 interface ImageUploadProps {
@@ -70,13 +69,6 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
     }
   }, [onImagesSelect, currentImages]);
 
-  const handleRemove = useCallback(() => {
-    setCompressionStatus({
-      stage: 'idle',
-      message: '',
-    });
-    // onImageRemove(); // This line was removed from the new_code, so it's removed here.
-  }, [onImageRemove]);
 
   const getStatusIcon = () => {
     switch (compressionStatus.stage) {
