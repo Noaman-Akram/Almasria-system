@@ -52,7 +52,7 @@ export interface OrderDetailWithStages {
   price: number;
   total_cost: number;
   notes?: string | null;
-  img_url?: string | null;
+  img_urls?: string[] | null;
   process_stage?: string | null;
   updated_at?: string | null;
   stages: OrderStage[];

@@ -389,7 +389,7 @@ export async function getAllOrders(): Promise<Order[]> {
           due_date,
           notes,
           process_stage,
-          img_url,
+          img_urls,
           updated_date,
           updated_at,
           price,
