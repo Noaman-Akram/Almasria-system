@@ -40,25 +40,19 @@
         top: 0px !important;
       }
       
-      /* Hide the original Google Translate widget completely */
+      /* Hide the original Google Translate widget by default */
       .goog-te-gadget {
         display: none !important;
       }
       
-      /* Hide any Google branding */
-      .goog-te-gadget > span > a {
+      /* Hide Google branding */
+      .goog-te-gadget-simple .goog-te-menu-value span:first-child {
         display: none !important;
       }
       
-      /* Hide Google Translate combo box */
+      /* Hide Google Translate combo box by default */
       .goog-te-combo {
         display: none !important;
-      }
-      
-      /* Ensure our custom dropdown has proper z-index */
-      .translate-dropdown {
-        z-index: 9999 !important;
-        position: relative !important;
       }
       
       /* Fix for body margin when Google Translate is active */
@@ -105,6 +99,20 @@
       
       .goog-te-ftab {
         display: none !important;
+      }
+      
+      /* Hide all Google Translate popups and floating elements */
+      .goog-te-menu2 {
+        display: none !important;
+      }
+      
+      .goog-te-menu-frame {
+        display: none !important;
+      }
+      
+      /* Prevent any Google Translate elements from appearing as popups */
+      [id*="goog-te"] {
+        position: static !important;
       }
     </style>
   </head>

@@ -248,6 +248,32 @@ const NewWorkOrder: React.FC = () => {
 
       console.log('[NewWorkOrder] Starting work order creation process');
 
+      // CRITICAL: Check if a work order already exists for this sale order
+      console.log('[NewWorkOrder] Checking for existing work order for sale order:', selectedSaleOrder.id);
+      
+      const { data: existingWorkOrder, error: checkError } = await supabase
+        .from('order_details')
+        .select('detail_id, order_id, assigned_to, created_at')
+        .eq('order_id', selectedSaleOrder.id)
+        .limit(1);
+
+      if (checkError) {
+        console.error('[NewWorkOrder] Error checking for existing work order:', checkError);
+        throw new Error('Failed to check for existing work order. Please try again.');
+      }
+
+      if (existingWorkOrder && existingWorkOrder.length > 0) {
+        console.log('[NewWorkOrder] Found existing work order:', existingWorkOrder[0]);
+        setToast({
+          type: 'error',
+          message: `A work order already exists for sale order ${selectedSaleOrder.code}. Please edit the existing work order instead of creating a new one.`,
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      console.log('[NewWorkOrder] No existing work order found, proceeding with creation');
+
       // Upload all selected images
       let imageUrls: string[] = [];
       for (let i = 0; i < selectedImageFiles.length; i++) {

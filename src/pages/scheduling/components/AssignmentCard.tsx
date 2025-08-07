@@ -137,25 +137,38 @@ export const AssignmentCard = ({
       <div className="space-y-2 mt-2">
         {/* Order Code and Priority */}
         <div className="font-medium flex items-center">
-          {order?.code && (
+          {assignment.note?.startsWith('MAINTENANCE:') ? (
+            <>
+              <ClipboardList className="h-3 w-3 mr-1 text-orange-600" />
+              <span className="text-orange-700 font-bold">MAINTENANCE</span>
+              <PriorityBadge priority={priority} />
+            </>
+          ) : order?.code ? (
             <>
               <ClipboardList className="h-3 w-3 mr-1 text-gray-600" />
               <span className="text-blue-700 font-bold">{order.code}</span>
               <PriorityBadge priority={priority} />
             </>
-          )}
+          ) : null}
         </div>
 
         {/* Stage and Status */}
         <div className="flex items-center justify-between">
-          {stage?.stage_name && (
+          {assignment.note?.startsWith('MAINTENANCE:') ? (
+            <Badge
+              variant="outline"
+              className="text-xs bg-orange-100 text-orange-800 border-orange-200"
+            >
+              Maintenance Work
+            </Badge>
+          ) : stage?.stage_name ? (
             <Badge
               variant="outline"
               className={`text-xs ${stageColors.badgeColor}`}
             >
               {stage.stage_name}
             </Badge>
-          )}
+          ) : null}
           <Badge
             variant="outline"
             className={
@@ -169,7 +182,14 @@ export const AssignmentCard = ({
         </div>
 
         {/* Customer Info */}
-        {order?.customer_name && (
+        {assignment.note?.startsWith('MAINTENANCE:') ? (
+          <div className="flex items-center text-muted-foreground">
+            <span className="mr-1 text-sm">
+              <User size={18} />
+            </span>
+            <span className="text-xs truncate">{assignment.note.split(' - ')[0]?.replace('MAINTENANCE: ', '') || 'Unknown Customer'}</span>
+          </div>
+        ) : order?.customer_name ? (
           <div className="flex items-center text-muted-foreground">
             <span className="mr-1 text-sm">
               {' '}
@@ -177,7 +197,7 @@ export const AssignmentCard = ({
             </span>
             <span className="text-xs truncate">{order.customer_name}</span>
           </div>
-        )}
+        ) : null}
 
         {/* Employee Info */}
         <div className="flex items-center text-muted-foreground">
@@ -206,9 +226,21 @@ export const AssignmentCard = ({
         </div>
 
         {/* Notes */}
-        {assignment.note && (
+        {assignment.note && !assignment.note.startsWith('MAINTENANCE:') && (
           <div className="text-xs text-muted-foreground bg-white bg-opacity-60 p-2 rounded truncate">
             <span className="font-medium">📝</span> {assignment.note}
+          </div>
+        )}
+        
+        {/* Maintenance Order Details */}
+        {assignment.note?.startsWith('MAINTENANCE:') && assignment.note.split(' - ').length > 3 && (
+          <div className="text-xs text-orange-700 bg-orange-50 p-2 rounded">
+            <div className="font-medium">🔧 Maintenance Details:</div>
+            <div className="mt-1 space-y-1">
+              {assignment.note.split(' - ').slice(3).map((detail, idx) => (
+                <div key={idx} className="truncate">{detail}</div>
+              ))}
+            </div>
           </div>
         )}
 

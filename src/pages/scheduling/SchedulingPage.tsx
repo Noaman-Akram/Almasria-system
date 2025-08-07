@@ -193,15 +193,32 @@ export default function SchedulingPage() {
         ? assignmentsData
         : [assignmentsData];
 
-      // Validate required fields for each assignment
+      // Validate required fields for each assignment (with maintenance order support)
       for (const assignment of assignmentsArray) {
-        if (
-          !assignment.order_stage_id ||
-          !assignment.employee_name ||
-          !assignment.work_date
-        ) {
+        // Check if this is a maintenance order
+        const isMaintenanceOrder = assignment.note?.startsWith('MAINTENANCE:');
+        
+        // For maintenance orders, order_stage_id can be null
+        // For regular orders, order_stage_id is required
+        const missingFields = [];
+        
+        if (!isMaintenanceOrder && !assignment.order_stage_id) {
+          missingFields.push('order_stage_id (required for regular orders)');
+        }
+        
+        if (!assignment.employee_name) {
+          missingFields.push('employee_name');
+        }
+        
+        if (!assignment.work_date) {
+          missingFields.push('work_date');
+        }
+        
+        if (missingFields.length > 0) {
           console.error('Missing required fields in assignment:', assignment);
-          throw new Error('Missing required fields in assignment');
+          console.error('Missing fields:', missingFields);
+          console.error('Is maintenance order:', isMaintenanceOrder);
+          throw new Error(`Missing required fields: ${missingFields.join(', ')}. Assignment data: ${JSON.stringify(assignment)}`);
         }
       }
 

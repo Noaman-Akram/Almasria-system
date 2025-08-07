@@ -208,6 +208,7 @@ export async function getAssignments(
 /**
  * Create a new assignment with automatic stage status update.
  * Matches the database schema fields exactly.
+ * Now handles maintenance orders with null order_stage_id.
  */
 export async function createAssignment(
   assignment: Omit<OrderStageAssignment, 'id'>
@@ -216,14 +217,26 @@ export async function createAssignment(
 
   // Validate required fields according to schema
   if (!assignment.employee_name || !assignment.work_date) {
+    const missingFields = [];
+    if (!assignment.employee_name) missingFields.push('employee_name');
+    if (!assignment.work_date) missingFields.push('work_date');
+    
     throw new Error(
-      'Missing required fields: employee_name and work_date are required'
+      `Missing required fields: ${missingFields.join(', ')} are required. Current values: employee_name="${assignment.employee_name}", work_date="${assignment.work_date}"`
+    );
+  }
+
+  // For regular orders, order_stage_id is required. For maintenance orders, it can be null
+  const isMaintenanceOrder = assignment.note?.startsWith('MAINTENANCE:');
+  if (!isMaintenanceOrder && !assignment.order_stage_id) {
+    throw new Error(
+      `Missing required field for regular orders: order_stage_id is required. Current value: order_stage_id="${assignment.order_stage_id}". Note: "${assignment.note}"`
     );
   }
 
   // Ensure we only send fields that exist in the database schema
   const sanitizedAssignment = {
-    order_stage_id: assignment.order_stage_id,
+    order_stage_id: assignment.order_stage_id, // Can be null for maintenance orders
     employee_name: assignment.employee_name,
     work_date: assignment.work_date,
     note: assignment.note || null,
@@ -247,7 +260,7 @@ export async function createAssignment(
   console.log('Created assignment:', data);
 
   // Automatically update stage status to "scheduled" if stage exists
-  if (assignment.order_stage_id) {
+  if (assignment.order_stage_id) { // Only update stage status for regular orders
     await updateStageStatusToScheduled(assignment.order_stage_id);
   }
 
@@ -375,7 +388,7 @@ export async function deleteAssignment(
  */
 export async function getAllOrders(): Promise<Order[]> {
   try {
-    console.log('Fetching all working orders with stages');
+    console.log('Fetching all working and maintenance orders with stages');
 
     const { data, error } = await supabase
       .from('orders')
@@ -410,7 +423,7 @@ export async function getAllOrders(): Promise<Order[]> {
         )
       `
       )
-      .eq('order_status', 'working')
+      .in('order_status', ['working', 'maintenance']) // Include maintenance orders
       .order('created_at', { ascending: false });
 
     if (error) {

@@ -5,10 +5,9 @@ import {
   addDays,
   eachDayOfInterval,
 } from 'date-fns';
-import { Calendar, ClipboardList, User, Info } from 'lucide-react';
+import { Calendar, ClipboardList, User, Info, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../../../components/components/ui/button';
 import { Label } from '../../../components/components/ui/label';
-import { Textarea } from '../../../components/components/ui/textarea';
 import { Switch } from '../../../components/components/ui/switch';
 import {
   Dialog,
@@ -29,10 +28,12 @@ import {
   OrderStageAssignment,
 } from '../types';
 import DateRangePicker from '../ui/DateRangePicker';
-import MultiSelect from '../ui/MultiSelect';
-import { STATIC_EMPLOYEES } from '../constants';
 import useOrders from '../hooks/useOrders';
 import { supabase } from '../../../lib/supabase';
+import { WORK_TYPES } from '../../../lib/constants';
+import { useAuth } from '../../../contexts/AuthContext';
+import { Settings } from 'lucide-react';
+import { Textarea } from '../../../components/components/ui/textarea';
 
 interface AssignmentFormProps {
   isOpen: boolean;
@@ -55,6 +56,16 @@ interface FormState {
   isMultiDay: boolean;
   note: string;
   errors: Record<string, string>;
+  // Maintenance order fields
+  isMaintenanceOrder: boolean;
+  maintenanceData: {
+    customer_name: string;
+    address: string;
+    company: string;
+    phone_number: string;
+    work_types: string[];
+    estimated_price: number;
+  };
 }
 
 // Stage status color mapping
@@ -121,6 +132,8 @@ export function AssignmentForm({
   additionalAssignments = [], // NEW: Additional assignments for multi-employee editing
   date,
 }: AssignmentFormProps) {
+  useAuth();
+  
   // --- SIMPLE ORDER SELECTION VARIABLE (ONLY CHANGES WHEN USER SELECTS) ---
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   
@@ -133,6 +146,15 @@ export function AssignmentForm({
     isMultiDay: false,
     note: '',
     errors: {},
+    isMaintenanceOrder: false,
+    maintenanceData: {
+      customer_name: '',
+      address: '',
+      company: '',
+      phone_number: '',
+      work_types: [],
+      estimated_price: 0,
+    },
   });
 
   // --- Static stages for selected order ---
@@ -260,7 +282,8 @@ export function AssignmentForm({
           const allAssignments = [assignment, ...additionalAssignments];
           const allEmployees = allAssignments
             .map((a) => a.employee_name)
-            .filter(Boolean);
+            .filter(Boolean)
+            .filter(name => name.trim().length > 0);
 
           // SET THE ORDER SELECTION (ONLY PLACE IT GETS SET FOR EDITING)
           setSelectedOrderId(order.id);
@@ -277,6 +300,7 @@ export function AssignmentForm({
             isMultiDay: false,
             note: assignment.note || '',
             errors: {},
+            isMaintenanceOrder: order.order_status === 'maintenance',
           });
 
           // Set stages from existing stages prop (NO FETCH NEEDED FOR EDITING)
@@ -304,10 +328,19 @@ export function AssignmentForm({
       setStagesForOrder([]);
       updateFormState({
         selectedStageId: null,
-        selectedEmployees: [],
+        selectedEmployees: [''], // Start with one empty employee field
         note: '',
         isMultiDay: false,
         errors: {},
+        isMaintenanceOrder: false,
+        maintenanceData: {
+          customer_name: '',
+          address: '',
+          company: '',
+          phone_number: '',
+          work_types: [],
+          estimated_price: 0,
+        },
       });
     }
   }, [assignment, additionalAssignments, date, stages, orders, updateFormState]);
@@ -316,12 +349,27 @@ export function AssignmentForm({
   const validateForm = useCallback(() => {
     const newErrors: Record<string, string> = {};
 
-    if (!selectedOrderId) {
-      newErrors.order = 'Please select an order';
+    if (formState.isMaintenanceOrder) {
+      // Validation for maintenance orders
+      if (!formState.maintenanceData.customer_name.trim()) {
+        newErrors.customer_name = 'Customer name is required';
+      }
+      if (!formState.maintenanceData.address.trim()) {
+        newErrors.address = 'Address is required';
+      }
+      if (formState.maintenanceData.work_types.length === 0) {
+        newErrors.work_types = 'Please select at least one work type';
+      }
+    } else {
+      // Validation for regular orders
+      if (!selectedOrderId) {
+        newErrors.order = 'Please select an order';
+      }
+      if (!formState.selectedStageId) {
+        newErrors.stage = 'Please select a stage';
+      }
     }
-    if (!formState.selectedStageId) {
-      newErrors.stage = 'Please select a stage';
-    }
+    
     if (formState.selectedEmployees.length === 0) {
       newErrors.employees = 'Please select at least one employee';
     }
@@ -341,6 +389,21 @@ export function AssignmentForm({
     }
 
     updateFormState({ errors: newErrors });
+    
+    // Debug logging for validation
+    if (Object.keys(newErrors).length > 0) {
+      console.log('[AssignmentForm] Validation errors:', newErrors);
+      console.log('[AssignmentForm] Current form state:', {
+        isMaintenanceOrder: formState.isMaintenanceOrder,
+        selectedOrderId,
+        selectedStageId: formState.selectedStageId,
+        selectedEmployees: formState.selectedEmployees,
+        startDate: formState.startDate,
+        endDate: formState.endDate,
+        maintenanceData: formState.maintenanceData
+      });
+    }
+    
     return Object.keys(newErrors).length === 0;
   }, [selectedOrderId, formState, updateFormState]);
 
@@ -374,15 +437,6 @@ export function AssignmentForm({
     [updateFormState, formState.errors]
   );
 
-  const handleEmployeesChange = useCallback(
-    (employees: string[]) => {
-      updateFormState({
-        selectedEmployees: employees,
-        errors: { ...formState.errors, employees: '' },
-      });
-    },
-    [updateFormState, formState.errors]
-  );
 
   const handleStartDateChange = useCallback(
     (date: Date | null) => {
@@ -428,6 +482,74 @@ export function AssignmentForm({
     [updateFormState]
   );
 
+  // --- Maintenance Order Handlers ---
+  const handleMaintenanceToggle = useCallback(
+    (checked: boolean) => {
+      updateFormState({ 
+        isMaintenanceOrder: checked,
+        selectedStageId: null,
+        errors: {},
+      });
+      if (checked) {
+        setSelectedOrderId(null);
+        setStagesForOrder([]);
+      }
+    },
+    [updateFormState]
+  );
+
+  const handleMaintenanceDataChange = useCallback(
+    (field: keyof FormState['maintenanceData'], value: any) => {
+      updateFormState({
+        maintenanceData: {
+          ...formState.maintenanceData,
+          [field]: value,
+        },
+        errors: { ...formState.errors, [field]: '' },
+      });
+    },
+    [formState.maintenanceData, formState.errors, updateFormState]
+  );
+
+  const handleWorkTypeToggle = useCallback(
+    (workType: string) => {
+      const currentTypes = formState.maintenanceData.work_types;
+      const newTypes = currentTypes.includes(workType)
+        ? currentTypes.filter(t => t !== workType)
+        : [...currentTypes, workType];
+      
+      handleMaintenanceDataChange('work_types', newTypes);
+    },
+    [formState.maintenanceData.work_types, handleMaintenanceDataChange]
+  );
+
+  // Employee list management functions
+  const addEmployee = useCallback(() => {
+    updateFormState({
+      selectedEmployees: [...formState.selectedEmployees, ''],
+      errors: { ...formState.errors, employees: '' },
+    });
+  }, [formState.selectedEmployees, formState.errors, updateFormState]);
+
+  const removeEmployee = useCallback((index: number) => {
+    if (formState.selectedEmployees.length > 1) {
+      const newEmployees = formState.selectedEmployees.filter((_, i) => i !== index);
+      updateFormState({
+        selectedEmployees: newEmployees,
+        errors: { ...formState.errors, employees: '' },
+      });
+    }
+  }, [formState.selectedEmployees, formState.errors, updateFormState]);
+
+  const updateEmployee = useCallback((index: number, value: string) => {
+    const newEmployees = [...formState.selectedEmployees];
+    newEmployees[index] = value;
+    updateFormState({
+      selectedEmployees: newEmployees,
+      errors: { ...formState.errors, employees: '' },
+    });
+  }, [formState.selectedEmployees, formState.errors, updateFormState]);
+
   // --- Form Submission ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -436,6 +558,60 @@ export function AssignmentForm({
     setLoading(true);
 
     try {
+      if (formState.isMaintenanceOrder) {
+        // Handle maintenance order creation
+        console.log('[AssignmentForm] Creating maintenance order assignment');
+        
+        // Create a simple maintenance order record in localStorage for now
+        const maintenanceOrder = {
+          id: Date.now(), // Simple ID generation
+          customer_name: formState.maintenanceData.customer_name,
+          company: formState.maintenanceData.company,
+          address: formState.maintenanceData.address,
+          phone_number: formState.maintenanceData.phone_number,
+          work_types: formState.maintenanceData.work_types,
+          estimated_price: formState.maintenanceData.estimated_price,
+          created_at: new Date().toISOString(),
+          status: 'maintenance'
+        };
+
+        // Store in localStorage for now (minimal approach)
+        const existingMaintenanceOrders = JSON.parse(localStorage.getItem('maintenanceOrders') || '[]');
+        existingMaintenanceOrders.push(maintenanceOrder);
+        localStorage.setItem('maintenanceOrders', JSON.stringify(existingMaintenanceOrders));
+
+        // Create assignments for each employee
+        const assignmentsToSubmit: Omit<OrderStageAssignment, 'id'>[] = [];
+
+        for (const employee of formState.selectedEmployees) {
+          assignmentsToSubmit.push({
+            order_stage_id: 0, // Use 0 to indicate no stage for maintenance orders
+            employee_name: employee,
+            work_date: format(formState.startDate!, 'yyyy-MM-dd'),
+            note: `MAINTENANCE: ${formState.maintenanceData.customer_name} - ${formState.maintenanceData.work_types.join(', ')} - ${formState.note || 'No additional notes'}`,
+            is_done: false,
+            created_at: new Date().toISOString(),
+            employee_rate: null,
+          });
+        }
+
+        console.log('[AssignmentForm] Maintenance assignments to submit:', assignmentsToSubmit);
+        
+        // Validate each assignment before submitting
+        for (const assignment of assignmentsToSubmit) {
+          if (!assignment.employee_name) {
+            throw new Error(`Missing employee_name in assignment: ${JSON.stringify(assignment)}`);
+          }
+          if (!assignment.work_date) {
+            throw new Error(`Missing work_date in assignment: ${JSON.stringify(assignment)}`);
+          }
+        }
+
+        await onSubmit(assignmentsToSubmit);
+        return;
+      }
+
+      // Regular order processing
       const selectedStage = stagesForOrder.find(
         (s) => s.id === formState.selectedStageId
       );
@@ -571,14 +747,135 @@ export function AssignmentForm({
           <div className="grid gap-6 py-4">
             {/* Order and Stage Selection */}
             <div className="bg-gray-50 p-4 rounded-lg space-y-4">
+              {/* Maintenance Order Toggle */}
+              <div className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <div className="bg-orange-100 p-2 rounded-full">
+                    <Settings className="h-4 w-4 text-orange-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-gray-900">Maintenance Order</h4>
+                    <p className="text-sm text-gray-600">Create a custom maintenance assignment</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={formState.isMaintenanceOrder}
+                  onCheckedChange={handleMaintenanceToggle}
+                />
+              </div>
+
               <div className="flex items-center space-x-2 mb-2">
                 <ClipboardList className="h-5 w-5 text-green-600" />
                 <h3 className="text-lg font-medium text-gray-900">
-                  Order Details
+                  {formState.isMaintenanceOrder ? 'Maintenance Details' : 'Order Details'}
                 </h3>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {formState.isMaintenanceOrder ? (
+                /* Maintenance Order Form */
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="customer_name">Customer Name *</Label>
+                      <input
+                        id="customer_name"
+                        type="text"
+                        value={formState.maintenanceData.customer_name}
+                        onChange={(e) => handleMaintenanceDataChange('customer_name', e.target.value)}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500"
+                        placeholder="Enter customer name"
+                      />
+                      {formState.errors.customer_name && (
+                        <p className="text-sm text-red-500 mt-1">
+                          {formState.errors.customer_name}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="company">Company</Label>
+                      <input
+                        id="company"
+                        type="text"
+                        value={formState.maintenanceData.company}
+                        onChange={(e) => handleMaintenanceDataChange('company', e.target.value)}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500"
+                        placeholder="Company name (optional)"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="address">Address *</Label>
+                    <input
+                      id="address"
+                      type="text"
+                      value={formState.maintenanceData.address}
+                      onChange={(e) => handleMaintenanceDataChange('address', e.target.value)}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500"
+                      placeholder="Enter full address"
+                    />
+                    {formState.errors.address && (
+                      <p className="text-sm text-red-500 mt-1">
+                        {formState.errors.address}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="phone_number">Phone Number</Label>
+                    <input
+                      id="phone_number"
+                      type="tel"
+                      value={formState.maintenanceData.phone_number}
+                      onChange={(e) => handleMaintenanceDataChange('phone_number', e.target.value)}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500"
+                      placeholder="01012345678"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Work Types *</Label>
+                    <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {WORK_TYPES.map((workType) => (
+                        <button
+                          key={workType.value}
+                          type="button"
+                          onClick={() => handleWorkTypeToggle(workType.value)}
+                          className={`p-2 text-sm rounded-md border transition-colors ${
+                            formState.maintenanceData.work_types.includes(workType.value)
+                              ? 'bg-orange-100 border-orange-300 text-orange-800'
+                              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          {workType.label}
+                        </button>
+                      ))}
+                    </div>
+                    {formState.errors.work_types && (
+                      <p className="text-sm text-red-500 mt-1">
+                        {formState.errors.work_types}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="estimated_price">Estimated Price (EGP)</Label>
+                    <input
+                      id="estimated_price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formState.maintenanceData.estimated_price}
+                      onChange={(e) => handleMaintenanceDataChange('estimated_price', parseFloat(e.target.value) || 0)}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-orange-500 focus:border-orange-500"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+              ) : (
+                /* Regular Order Selection Form */
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <Label htmlFor="order">Order *</Label>
                   <Select
@@ -670,9 +967,10 @@ export function AssignmentForm({
                   )}
                 </div>
               </div>
+              )}
 
               {/* Selected Order Summary */}
-              {selectedOrder && (
+              {selectedOrder && !formState.isMaintenanceOrder && (
                 <div className="bg-white p-3 rounded border border-gray-200">
                   <h4 className="font-medium text-sm text-gray-700 mb-2">
                     Selected Order Summary
@@ -705,6 +1003,47 @@ export function AssignmentForm({
                   </div>
                 </div>
               )}
+
+              {/* Maintenance Order Summary */}
+              {formState.isMaintenanceOrder && formState.maintenanceData.customer_name && (
+                <div className="bg-orange-50 p-3 rounded border border-orange-200">
+                  <h4 className="font-medium text-sm text-orange-700 mb-2">
+                    Maintenance Order Summary
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="col-span-2">
+                      <span className="font-medium">Customer:</span>{' '}
+                      {formState.maintenanceData.customer_name}
+                    </div>
+                    {formState.maintenanceData.company && (
+                      <div className="col-span-2">
+                        <span className="font-medium">Company:</span>{' '}
+                        {formState.maintenanceData.company}
+                      </div>
+                    )}
+                    <div className="col-span-2">
+                      <span className="font-medium">Address:</span>{' '}
+                      {formState.maintenanceData.address}
+                    </div>
+                    {formState.maintenanceData.phone_number && (
+                      <div className="col-span-2">
+                        <span className="font-medium">Phone:</span>{' '}
+                        {formState.maintenanceData.phone_number}
+                      </div>
+                    )}
+                    <div className="col-span-2">
+                      <span className="font-medium">Work Types:</span>{' '}
+                      {formState.maintenanceData.work_types.join(', ')}
+                    </div>
+                    {formState.maintenanceData.estimated_price > 0 && (
+                      <div className="col-span-2">
+                        <span className="font-medium">Estimated Price:</span>{' '}
+                        {formState.maintenanceData.estimated_price} EGP
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Employee Selection */}
@@ -715,20 +1054,60 @@ export function AssignmentForm({
                   Employee Assignment
                 </h3>
               </div>
-
-              <div>
-                <Label className="mb-2 block">Employees *</Label>
-                <MultiSelect
-                  options={STATIC_EMPLOYEES}
-                  selected={formState.selectedEmployees}
-                  onChange={handleEmployeesChange}
-                />
-                {formState.errors.employees && (
-                  <p className="text-sm text-red-500 mt-1">
-                    {formState.errors.employees}
-                  </p>
-                )}
+              
+              <div className="space-y-3">
+                {formState.selectedEmployees.map((employee, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        value={employee}
+                        onChange={(e) => updateEmployee(index, e.target.value)}
+                        placeholder={`Employee ${index + 1} name (e.g., وائل امين)`}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addEmployee}
+                      className="flex items-center justify-center w-10 h-10 text-green-600 hover:text-green-700 hover:bg-green-50"
+                      title="Add another employee"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                    {formState.selectedEmployees.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeEmployee(index)}
+                        className="flex items-center justify-center w-10 h-10 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        title="Remove this employee"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                
+                <div className="mt-2 text-xs text-gray-500">
+                  <p>💡 <strong>Tip:</strong> Click the <Plus className="inline h-3 w-3" /> button to add more employees</p>
+                  <p>📝 <strong>Example names:</strong> وائل امين, هانى مهند, محمد فؤاد (توتا)</p>
+                  {formState.selectedEmployees.filter(e => e.trim()).length > 0 && (
+                    <p className="mt-1 text-green-600">
+                      ✓ {formState.selectedEmployees.filter(e => e.trim()).length} employee(s) selected: {formState.selectedEmployees.filter(e => e.trim()).join(', ')}
+                    </p>
+                  )}
+                </div>
               </div>
+              
+              {formState.errors.employees && (
+                <p className="text-sm text-red-500 mt-1">
+                  {formState.errors.employees}
+                </p>
+              )}
             </div>
 
             {/* Date Selection */}
@@ -813,12 +1192,14 @@ export function AssignmentForm({
             <Button
               type="submit"
               disabled={loading || ordersLoading || ordersError !== null}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className={formState.isMaintenanceOrder ? "bg-orange-600 hover:bg-orange-700 text-white" : "bg-green-600 hover:bg-green-700 text-white"}
             >
               {loading
                 ? 'Saving...'
                 : assignment
                 ? 'Update Assignment'
+                : formState.isMaintenanceOrder
+                ? 'Create Maintenance Order'
                 : 'Create Assignment'}
             </Button>
           </DialogFooter>
